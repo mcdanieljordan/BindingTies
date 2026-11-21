@@ -1,0 +1,155 @@
+import { Dexie } from 'dexie'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { db, getKV, setKV, SYNCED, SYNCED_KV } from '../db'
+import { sb } from './client'
+
+export type SyncState = 'off' | 'syncing' | 'ok' | 'offline' | 'error'
+export interface Status { state: SyncState; last?: number; error?: string; pending: number }
+let status: Status = { state: 'off', pending: 0 }
+const subs = new Set<() => void>()
+const set = (p: Partial<Status>) => { status = { ...status, ...p }; subs.forEach((f) => f()) }
+export const getStatus = () => status
+export const subscribe = (f: () => void) => { subs.add(f); return () => { subs.delete(f) } }
+
+const BUCKET = 'family-files'
+interface Rec { tbl: string; rid: string; data: Record<string, unknown> | null; deleted: boolean; updated_at: string }
+type Row = Record<string, unknown> & { id?: number; blob?: Blob }
+
+async function push(fid: string) {
+  if (!sb) return
+  for (;;) {
+    const batch = await db.outbox.orderBy('seq').limit(100).toArray()
+    if (!batch.length) break
+    const keys = new Map(batch.map((r) => [`${r.tbl}/${r.rid}`, r]))
+    const ups: Record<string, unknown>[] = []
+    const uploaded = new Set(await getKV<string[]>('sync:uploaded', []))
+    for (const r of keys.values()) {
+      if (r.tbl === 'kv') {
+        const row = await db.kv.get(r.rid)
+        ups.push({ family_id: fid, tbl: 'kv', rid: r.rid, data: row ? { key: row.key, value: row.value } : null, deleted: !row })
+        continue
+      }
+      const row = (await db.table(r.tbl).get(Number(r.rid))) as Row | undefined
+      if (!row) { ups.push({ family_id: fid, tbl: r.tbl, rid: r.rid, data: null, deleted: true }); continue }
+      const data: Row = { ...row }
+      if (data.blob instanceof Blob) {
+        const path = `${fid}/${r.tbl}/${r.rid}`
+        if (!uploaded.has(path)) {
+          const { error } = await sb.storage.from(BUCKET).upload(path, data.blob, { upsert: true, contentType: data.blob.type || 'application/octet-stream' })
+          if (error) throw error
+          uploaded.add(path)
+        }
+        data.blobPath = path
+        delete data.blob
+      }
+      ups.push({ family_id: fid, tbl: r.tbl, rid: r.rid, data, deleted: false })
+    }
+    const { error } = await sb.from('records').upsert(ups, { onConflict: 'family_id,tbl,rid' })
+    if (error) throw error
+    await setKV('sync:uploaded', [...uploaded].slice(-2000))
+    await db.outbox.bulkDelete(batch.map((r) => r.seq))
+  }
+}
+
+async function apply(recs: Rec[]) {
+  if (!sb || !recs.length) return
+  const pending = new Set((await db.outbox.toArray()).map((o) => `${o.tbl}/${o.rid}`))
+  const todo = recs.filter((r) => !pending.has(`${r.tbl}/${r.rid}`)) // local edits not yet sent win
+  // fetch files first: IndexedDB transactions can't wait on the network
+  const blobs = new Map<string, Blob>()
+  for (const r of todo) {
+    const path = r.data?.blobPath as string | undefined
+    if (!r.deleted && path && r.tbl !== 'kv') {
+      const local = (await db.table(r.tbl).get(Number(r.rid))) as Row | undefined
+      if (local?.blob) { blobs.set(r.rid + r.tbl, local.blob); continue }
+      const { data, error } = await sb.storage.from(BUCKET).download(path)
+      if (!error && data) blobs.set(r.rid + r.tbl, data)
+    }
+  }
+  await db.transaction('rw', db.tables, async () => {
+    ;(Dexie.currentTransaction as unknown as { remote: boolean }).remote = true
+    for (const r of todo) {
+      if (r.tbl === 'kv') {
+        if (!SYNCED_KV.includes(r.rid)) continue
+        if (r.deleted) await db.kv.delete(r.rid)
+        else await db.kv.put({ key: r.rid, value: (r.data as { value: unknown }).value })
+        continue
+      }
+      if (!(SYNCED as readonly string[]).includes(r.tbl)) continue
+      const tbl = db.table(r.tbl)
+      if (r.deleted) { await tbl.delete(Number(r.rid)); continue }
+      const row = { ...(r.data as Row) }
+      delete row.blobPath
+      const b = blobs.get(r.rid + r.tbl)
+      if (b) row.blob = b
+      await tbl.put(row)
+    }
+  })
+}
+
+async function pull(fid: string) {
+  if (!sb) return
+  let cursor = await getKV<string>('sync:cursor', '1970-01-01T00:00:00Z')
+  for (;;) {
+    const { data, error } = await sb.from('records').select('tbl,rid,data,deleted,updated_at').eq('family_id', fid).gt('updated_at', cursor).order('updated_at').limit(300)
+    if (error) throw error
+    if (!data?.length) break
+    await apply(data as Rec[])
+    cursor = data[data.length - 1].updated_at
+    await setKV('sync:cursor', cursor)
+    if (data.length < 300) break
+  }
+}
+
+let busy = false
+let again = false
+async function cycle(fid: string) {
+  if (busy) { again = true; return }
+  busy = true
+  set({ state: 'syncing' })
+  try {
+    await push(fid)
+    await pull(fid)
+    set({ state: 'ok', last: Date.now(), error: undefined, pending: await db.outbox.count() })
+  } catch (e) {
+    const offline = !navigator.onLine
+    set({ state: offline ? 'offline' : 'error', error: offline ? undefined : (e as Error).message, pending: await db.outbox.count() })
+  } finally {
+    busy = false
+    if (again) { again = false; void cycle(fid) }
+  }
+}
+
+let stop: (() => void) | null = null
+export function startSync(fid: string) {
+  stopSync()
+  if (!sb) return
+  const kick = () => void cycle(fid)
+  let debounce: number | undefined
+  const sub = (async () => {
+    // watch the outbox so local edits go up within a moment
+    const { liveQuery } = await import('dexie')
+    return liveQuery(() => db.outbox.count()).subscribe((n) => {
+      set({ pending: n })
+      if (n > 0) { clearTimeout(debounce); debounce = window.setTimeout(kick, 800) }
+    })
+  })()
+  const ch: RealtimeChannel = sb
+    .channel(`records-${fid}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'records', filter: `family_id=eq.${fid}` }, (p) => {
+      const r = (p.new && Object.keys(p.new).length ? p.new : null) as Rec | null
+      if (r) void apply([r])
+    })
+    .subscribe()
+  const timer = window.setInterval(kick, 60000)
+  window.addEventListener('online', kick)
+  kick()
+  stop = () => {
+    clearInterval(timer); clearTimeout(debounce)
+    window.removeEventListener('online', kick)
+    void sb!.removeChannel(ch)
+    void sub.then((s) => s.unsubscribe())
+  }
+}
+export function stopSync() { stop?.(); stop = null; set({ state: 'off' }) }
+export const syncNow = (fid: string) => cycle(fid)

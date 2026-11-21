@@ -1,0 +1,12 @@
+-- Run after: schema.sql, deploying the send-due function, and inserting server_config rows.
+-- Replace __PROJECT_REF__.
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select cron.schedule('familyos-send-due', '* * * * *', $$
+  select net.http_post(
+    url := 'https://__PROJECT_REF__.supabase.co/functions/v1/send-due',
+    headers := jsonb_build_object('Content-Type', 'application/json',
+      'x-cron-secret', (select value from public.server_config where key = 'cron_secret')),
+    body := '{}'::jsonb)
+$$);
+select cron.schedule('familyos-clean-push-log', '17 3 * * *', $$ delete from public.push_log where created_at < now() - interval '3 days' $$);
