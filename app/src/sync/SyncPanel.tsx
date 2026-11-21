@@ -1,24 +1,27 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { Cloud, CloudOff, Copy, LogOut, RefreshCw, Bell } from 'lucide-react'
 import { getStatus, subscribe, syncNow } from './engine'
-import { disablePush, enablePush, pushActive, pushSupported, type FamilyInfo } from './account'
+import { denyMember, disablePush, enablePush, familyAccounts, pushActive, pushSupported, type FamilyAccount } from './account'
 import { syncConfigured } from './client'
 import { useApp } from '../ctx'
-import { getKV } from '../db'
+import { useMembers } from '../lib/useData'
+import JoinRequests from './JoinRequests'
 import { useSession } from './useSession'
 
 export function useSyncStatus() { return useSyncExternalStore(subscribe, getStatus) }
 
 /** Account area in Settings. Signing in happens on the front screen, not here. */
 export default function SyncPanel() {
-  const { toast, leaveFamily } = useApp()
+  const { toast, leaveFamily, family: fam } = useApp()
+  const members = useMembers()
+  const [accts, setAccts] = useState<FamilyAccount[]>([])
   const st = useSyncStatus()
   const session = useSession()
-  const [fam, setFam] = useState<FamilyInfo | null>(null)
   const [push, setPush] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => { void getKV<FamilyInfo | null>('sync:family', null).then(setFam); void pushActive().then(setPush) }, [session.uid])
+  const loadAccts = () => { if (fam?.status === 'approved') void familyAccounts(fam.id).then(setAccts).catch(() => {}) }
+  useEffect(() => { void pushActive().then(setPush); loadAccts() }, [session.uid, fam?.id])
 
   if (!syncConfigured) return <div className="muted">Cloud sharing is not turned on in this copy of the app.</div>
   if (!session.uid || !fam) return (
@@ -39,6 +42,18 @@ export default function SyncPanel() {
         <div className="grow"><div className="title">Family code</div><div className="muted">Give this to family members so they can join.</div></div>
         <b className="kbd" style={{ fontSize: 20 }}>{fam.invite_code}</b>
         <button className="btn sm" aria-label="Copy code" onClick={() => { void navigator.clipboard.writeText(fam.invite_code); toast({ title: 'Code copied' }) }}><Copy size={14} /></button>
+      </div>
+      <JoinRequests />
+      <div>
+        <div className="muted" style={{ fontWeight: 800, marginBottom: 6 }}>Logins in this family</div>
+        <div className="stack">
+          {accts.map((a) => (
+            <div className="item" key={a.user_id}>
+              <div className="grow"><div className="title">{a.email}</div><div className="muted">{members.find((m) => m.id === a.member_id)?.name ?? 'Not linked to a person'} • {a.role === 'owner' ? 'Owner' : a.role === 'parent' ? 'Parent' : 'Family member'}</div></div>
+              {a.user_id !== session.uid && a.role !== 'owner' && fam.role !== 'member' && <button className="btn ghost sm" onClick={async () => { if (confirm(`Remove ${a.email} from the family?`)) { await denyMember(fam.id, a.user_id); loadAccts() } }}>Remove</button>}
+            </div>
+          ))}
+        </div>
       </div>
       <div className="row">
         <button className="btn" onClick={() => void syncNow(fam.id)}><RefreshCw size={14} />Update now</button>

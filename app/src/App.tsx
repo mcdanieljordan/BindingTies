@@ -18,9 +18,10 @@ import Welcome from './views/Welcome'
 import Landing from './views/Landing'
 import FamilyStep from './views/FamilyStep'
 import WhoIs from './views/WhoIs'
+import Pending from './views/Pending'
 import { useSession } from './sync/useSession'
 import { syncConfigured } from './sync/client'
-import { myFamily, signOut, type FamilyInfo } from './sync/account'
+import { linkMember, myFamily, signOut, type FamilyInfo } from './sync/account'
 import { startSync, stopSync, syncNow } from './sync/engine'
 import { useSyncStatus } from './sync/SyncPanel'
 
@@ -45,7 +46,6 @@ export default function App() {
   const [pickWho, setPickWho] = useState(false)
   const [auth, setAuth] = useState<'in' | 'new' | null>(null) // null = show the home page
   const [fam, setFam] = useState<FamilyInfo | null | undefined>(undefined) // undefined = checking
-  const [justJoined, setJustJoined] = useState(false)
   const [waited, setWaited] = useState(false)
   const [view, setView] = useState<string>('today')
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -89,18 +89,23 @@ export default function App() {
     })()
     return () => { live = false }
   }, [session.uid, session.loading])
-  useEffect(() => { if (fam && session.uid) startSync(fam.id); else stopSync() }, [fam, session.uid])
+  useEffect(() => { if (fam && fam.status === 'approved' && session.uid) startSync(fam.id); else stopSync() }, [fam?.id, fam?.status, session.uid])
   useEffect(() => { if (!fam) return; const t = setTimeout(() => setWaited(true), 8000); return () => clearTimeout(t) }, [fam])
 
   const setSettings = (p: Partial<Settings>) => { const n = { ...settings, ...p }; setS(n); void setKV('settings', n) }
   const setMe = (id: number | undefined) => { setMeState(id); void setKV('me', id); setPickWho(false) }
+  // first time this login picks a person, remember it on the account so next time it opens straight to them
+  const pickMe = (id: number) => {
+    setMe(id)
+    if (fam && fam.status === 'approved' && fam.member_id == null && session.uid) void linkMember(fam.id, id).then(() => { const n = { ...fam, member_id: id }; setFam(n); void setKV('sync:family', n) }).catch(() => {})
+  }
   const leaveFamily = async () => {
     if (session.uid) { try { await syncNow(fam!.id) } catch { /* keep going */ } await signOut() }
-    stopSync(); await wipeLocal(); await setKV('localOnly', false); setLocalOnly(false); setFam(null); setMeState(undefined); setJustJoined(false); setWaited(false)
+    stopSync(); await wipeLocal(); await setKV('localOnly', false); setLocalOnly(false); setFam(null); setMeState(undefined); setWaited(false)
   }
 
   if (!loaded || members === undefined || me === null) return null
-  const ctx = { settings, setSettings, toast, go: setView, openWall: () => setWall(true), me: me ?? undefined, setMe, leaveFamily }
+  const ctx = { settings, setSettings, toast, go: setView, openWall: () => setWall(true), me: me ?? undefined, setMe, leaveFamily, family: fam ?? undefined }
   const wrap = (el: React.ReactNode) => <AppCtx.Provider value={ctx}>{el}</AppCtx.Provider>
 
   // ---- front door ----
@@ -109,19 +114,23 @@ export default function App() {
     const goLocal = () => { setLocalOnly(true); void setKV('localOnly', true) }
     if (!session.uid) return wrap(auth ? <Welcome start={auth} onLocal={goLocal} onBack={() => setAuth(null)} /> : <Landing onStart={() => setAuth('new')} onSignIn={() => setAuth('in')} onLocal={goLocal} />)
     if (fam === undefined) return <Splash text="Opening your family…" />
-    if (!fam) return wrap(<FamilyStep email={session.email} onDone={(f, joined) => { setFam(f); setJustJoined(joined); void setKV('sync:family', f) }} />)
+    if (fam && fam.status === 'pending') return wrap(<Pending fam={fam} email={session.email} onUpdate={(f) => { setFam(f); void setKV('sync:family', f) }} />)
+    if (!fam) return wrap(<FamilyStep email={session.email} onDone={(f) => { setFam(f); void setKV('sync:family', f) }} />)
   }
   if (members.length === 0) {
-    if (fam && justJoined && st.state !== 'ok' && !waited) return <Splash text="Getting your family…" />
-    if (fam && !justJoined && st.state === 'syncing' && !waited) return <Splash text="Getting your family…" />
+    const joiner = fam?.status === 'approved' && fam.role !== 'owner'
+    if (joiner && !waited) return <Splash text="Getting your family…" />
+    if (fam && st.state === 'syncing' && !waited) return <Splash text="Getting your family…" />
     return wrap(<Onboarding />)
   }
   const meMember = members.find((m) => m.id === me)
   if (!meMember) {
-    if (members.length === 1) { setTimeout(() => setMe(members[0].id), 0); return null }
-    return wrap(<WhoIs members={members} onPick={setMe} />)
+    const linked = fam?.status === 'approved' ? members.find((m) => m.id === fam.member_id) : undefined
+    if (linked) { setTimeout(() => setMe(linked.id), 0); return null }
+    if (members.length === 1) { setTimeout(() => pickMe(members[0].id), 0); return null }
+    return wrap(<WhoIs members={members} onPick={pickMe} />)
   }
-  if (pickWho) return wrap(<WhoIs members={members} onPick={setMe} onClose={() => setPickWho(false)} />)
+  if (pickWho) return wrap(<WhoIs members={members} onPick={pickMe} onClose={() => setPickWho(false)} />)
 
   return (
     <AppCtx.Provider value={ctx}>

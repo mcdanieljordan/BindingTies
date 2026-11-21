@@ -6,3 +6,5 @@
 4. Run `cron.sql.template` with the project ref filled in.
 5. In `app/.env.local` set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_VAPID_PUBLIC_KEY` (public key is in `app/.env.local.pending`).
 6. Supabase dashboard > Authentication: decide whether email confirmation stays on (recommended).
+
+7. Apply `migration_002_approval_linking.sql` (join approval, roles, linking accounts to family people).

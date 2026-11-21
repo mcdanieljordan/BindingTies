@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Settings, Toast } from './lib/engine'
+import type { FamilyInfo } from './sync/account'
 
 export interface Ctx {
   settings: Settings
@@ -10,6 +11,8 @@ export interface Ctx {
   openWall: () => void
   /** The person using this device right now (a family member profile id) */
   me?: number
+  /** The cloud family this account belongs to (undefined when using the app without an account) */
+  family?: FamilyInfo
   setMe: (id: number | undefined) => void
   /** Sign out of the cloud family and clear this device */
   leaveFamily: () => Promise<void>

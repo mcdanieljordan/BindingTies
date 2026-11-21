@@ -1,6 +1,8 @@
 import { sb, VAPID_PUBLIC } from './client'
 
-export interface FamilyInfo { id: string; name: string; invite_code: string; tz: string }
+export interface FamilyInfo { id: string; name: string; invite_code: string; tz: string; status: 'pending' | 'approved'; member_id: number | null; role: 'owner' | 'parent' | 'member' }
+export interface JoinRequest { user_id: string; email: string; requested: string }
+export interface FamilyAccount { user_id: string; email: string; member_id: number | null; role: 'owner' | 'parent' | 'member' }
 
 export async function currentUser() {
   if (!sb) return null
@@ -19,9 +21,9 @@ export async function signIn(email: string, password: string) {
 export const signOut = () => sb!.auth.signOut()
 
 export async function myFamily(): Promise<FamilyInfo | null> {
-  const { data, error } = await sb!.from('families').select('id,name,invite_code,tz').limit(1)
+  const { data, error } = await sb!.rpc('my_membership')
   if (error) throw error
-  return (data?.[0] as FamilyInfo) ?? null
+  return (data as FamilyInfo | null) ?? null
 }
 export async function createFamily(name: string): Promise<FamilyInfo> {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -29,10 +31,33 @@ export async function createFamily(name: string): Promise<FamilyInfo> {
   if (error) throw error
   return data as FamilyInfo
 }
+/** Asks to join. The family's parents must approve before anything is shared. */
 export async function joinFamily(code: string): Promise<FamilyInfo> {
   const { data, error } = await sb!.rpc('join_family', { p_code: code.trim().toUpperCase() })
   if (error) throw error
   return data as FamilyInfo
+}
+export async function pendingRequests(fid: string): Promise<JoinRequest[]> {
+  const { data, error } = await sb!.rpc('pending_requests', { p_family: fid })
+  if (error) throw error
+  return (data as JoinRequest[]) ?? []
+}
+export async function familyAccounts(fid: string): Promise<FamilyAccount[]> {
+  const { data, error } = await sb!.rpc('family_accounts', { p_family: fid })
+  if (error) throw error
+  return (data as FamilyAccount[]) ?? []
+}
+export async function approveMember(fid: string, uid: string, memberId: number | null, role: 'parent' | 'member') {
+  const { error } = await sb!.rpc('approve_member', { p_family: fid, p_user: uid, p_member_id: memberId, p_role: role })
+  if (error) throw error
+}
+export async function denyMember(fid: string, uid: string) {
+  const { error } = await sb!.rpc('deny_member', { p_family: fid, p_user: uid })
+  if (error) throw error
+}
+export async function linkMember(fid: string, memberId: number) {
+  const { error } = await sb!.rpc('link_member', { p_family: fid, p_member_id: memberId })
+  if (error) throw error
 }
 
 /* ---------- Web Push ---------- */
