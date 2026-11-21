@@ -67,3 +67,13 @@ export async function disablePush() {
   if (sub) { await sb!.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe() }
   try { localStorage.setItem('fos-push', '0') } catch { /* ignore */ }
 }
+
+export const googleEnabled = import.meta.env.VITE_GOOGLE_ENABLED === 'true'
+export async function signInGoogle() {
+  const { error } = await sb!.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + import.meta.env.BASE_URL } })
+  if (error) throw error
+}
+export async function resetPassword(email: string) {
+  const { error } = await sb!.auth.resetPasswordForEmail(email, { redirectTo: location.origin + import.meta.env.BASE_URL })
+  if (error) throw error
+}

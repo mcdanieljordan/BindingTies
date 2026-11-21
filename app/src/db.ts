@@ -249,3 +249,13 @@ export const DEFAULT_QUEST: Quest = {
   reward: 'Pizza and a movie together',
   since: Date.now(),
 }
+
+/** Remove all family data from this device (cloud copy is untouched). Keeps device settings. */
+export async function wipeLocal() {
+  await db.transaction('rw', db.tables, async () => {
+    for (const t of db.tables) {
+      if (t.name === 'kv') await t.filter((r) => !['settings', 'legacyDone'].includes((r as KV).key)).delete()
+      else await t.clear()
+    }
+  })
+}

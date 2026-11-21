@@ -162,3 +162,24 @@ label.f > input, label.f > select, label.f > textarea { color: var(--ink); font-
 .pr-grid .pr-label { font-size: 20px; flex: none; }
 .pr-box { width: 40px; height: 40px; border: 4px solid #000; border-radius: 8px; flex: none; }
 .pr-foot { margin-top: 12px; font-size: 13px; color: #444; text-align: center; }
+
+/* ---------- front door (sign in, family, who's using) ---------- */
+.gate { min-height: 100%; display: grid; place-items: center; padding: 20px; background: radial-gradient(ellipse at 80% 0, color-mix(in srgb, var(--primary) 25%, transparent), transparent 45%), var(--bg); }
+.gate-card { width: min(520px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: 28px; padding: clamp(20px, 5vw, 36px); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 18px; }
+.gate-card h1 { font-size: clamp(28px, 6vw, 36px); text-align: center; }
+.gate-card p { margin: 0; text-align: center; color: var(--muted); font-size: 18px; }
+.gate-logo { align-self: center; width: 72px; height: 72px; border-radius: 22px; background: linear-gradient(140deg, #9f8bff, #4de4c4); display: grid; place-items: center; color: #101529; }
+.gate input { font-size: 20px; padding: 15px 16px; border-radius: 16px; width: 100%; }
+.btn.huge { font-size: 20px; padding: 16px 22px; border-radius: 18px; justify-content: center; width: 100%; min-height: 58px; }
+.gate .seg { display: grid; grid-template-columns: 1fr 1fr; }
+.gate .seg button { font-size: 18px; padding: 14px 8px; }
+.gate .link { background: none; border: 0; color: var(--primary); font-weight: 700; font-size: 17px; padding: 10px; text-decoration: underline; cursor: pointer; }
+.gate .or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 15px; }
+.gate .or::before, .gate .or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.pw { position: relative; }
+.pw button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: 0; padding: 8px 10px; font-weight: 800; color: var(--primary); font-size: 15px; }
+.who-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; }
+.who { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 8px; border: 3px solid var(--border); border-radius: 24px; background: var(--panel2); font-size: 22px; font-weight: 800; }
+.who:hover, .who:focus-visible { border-color: var(--primary); }
+.err { background: color-mix(in srgb, var(--danger) 16%, var(--panel)); border: 1px solid var(--danger); color: var(--ink); border-radius: 14px; padding: 12px 14px; font-size: 16px; }
+.ok { background: color-mix(in srgb, var(--mint) 16%, var(--panel)); border: 1px solid var(--mint); border-radius: 14px; padding: 12px 14px; font-size: 16px; }

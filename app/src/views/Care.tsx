@@ -25,7 +25,7 @@ export default function Care() {
 }
 
 function Meds() {
-  const { toast } = useApp()
+  const { toast, me } = useApp()
   const members = useMembers()
   const meds = useMeds()
   const today = todayStr()
@@ -34,15 +34,15 @@ function Meds() {
   const [giver, setGiver] = useState<number>()
   const mem = (id?: number) => members.find((m) => m.id === id)
   const givers = members.filter((m) => m.role !== 'child')
-  const me = giver ?? givers[0]?.id
+  const who = giver ?? (givers.some((g) => g.id === me) ? me : givers[0]?.id)
   const now = nowHm()
 
   async function give(medId: number, time: string) {
-    if (!me) return
+    if (!who) return
     const dup = await db.doses.where('medId').equals(medId).filter((d) => d.date === today && d.time === time).first()
     if (dup) return toast({ title: 'Already given', body: `${mem(dup.givenBy)?.name} gave this dose.`, kind: 'warn' })
-    await db.doses.add({ medId, date: today, time, givenBy: me, ts: Date.now() } as never)
-    toast({ title: 'Dose logged', body: `Given by ${mem(me)?.name} at ${fmtTime(nowHm())}` })
+    await db.doses.add({ medId, date: today, time, givenBy: who, ts: Date.now() } as never)
+    toast({ title: 'Dose logged', body: `Given by ${mem(who)?.name} at ${fmtTime(nowHm())}` })
   }
   async function add() {
     const memberId = f.memberId || members[0].id
@@ -56,7 +56,7 @@ function Meds() {
     <div className="grid g2">
       <div className="card" style={{ marginTop: 0 }}>
         <div className="row between"><h3>Today</h3>
-          <label className="row muted small">Logging as<MemberPick members={givers} value={me} onChange={setGiver} /></label></div>
+          <label className="row muted small">Logging as<MemberPick members={givers} value={who} onChange={setGiver} /></label></div>
         <div className="muted small" style={{ marginTop: 4 }}><Lock size={12} style={{ verticalAlign: -1 }} /> Once a dose is logged, the other adult sees who gave it and when, so nobody doubles up.</div>
         <div className="stack" style={{ marginTop: 10 }}>
           {meds.filter((m) => m.active).length === 0 && <Empty>No medicines or vitamins yet.</Empty>}
