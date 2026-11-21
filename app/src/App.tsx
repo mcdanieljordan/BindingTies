@@ -15,6 +15,7 @@ import SettingsView from './views/SettingsView'
 import Wall from './views/Wall'
 import Onboarding from './views/Onboarding'
 import Welcome from './views/Welcome'
+import Landing from './views/Landing'
 import FamilyStep from './views/FamilyStep'
 import WhoIs from './views/WhoIs'
 import { useSession } from './sync/useSession'
@@ -42,6 +43,7 @@ export default function App() {
   const [localOnly, setLocalOnly] = useState(false)
   const [me, setMeState] = useState<number | undefined | null>(null) // null = not loaded yet
   const [pickWho, setPickWho] = useState(false)
+  const [auth, setAuth] = useState<'in' | 'new' | null>(null) // null = show the home page
   const [fam, setFam] = useState<FamilyInfo | null | undefined>(undefined) // undefined = checking
   const [justJoined, setJustJoined] = useState(false)
   const [waited, setWaited] = useState(false)
@@ -104,7 +106,8 @@ export default function App() {
   // ---- front door ----
   if (syncConfigured && !localOnly) {
     if (session.loading) return <Splash text="Opening FamilyOS…" />
-    if (!session.uid) return wrap(<Welcome onLocal={() => { setLocalOnly(true); void setKV('localOnly', true) }} />)
+    const goLocal = () => { setLocalOnly(true); void setKV('localOnly', true) }
+    if (!session.uid) return wrap(auth ? <Welcome start={auth} onLocal={goLocal} onBack={() => setAuth(null)} /> : <Landing onStart={() => setAuth('new')} onSignIn={() => setAuth('in')} onLocal={goLocal} />)
     if (fam === undefined) return <Splash text="Opening your family…" />
     if (!fam) return wrap(<FamilyStep email={session.email} onDone={(f, joined) => { setFam(f); setJustJoined(joined); void setKV('sync:family', f) }} />)
   }

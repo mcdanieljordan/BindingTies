@@ -10,8 +10,8 @@ const friendly = (m: string) =>
   /valid email|invalid email/i.test(m) ? 'That email address does not look right.' :
   /not confirmed/i.test(m) ? 'Please open the email we sent you and tap the link first.' : m
 
-export default function Welcome({ onLocal }: { onLocal: () => void }) {
-  const [mode, setMode] = useState<'in' | 'new'>('in')
+export default function Welcome({ onLocal, onBack, start = 'in' }: { onLocal: () => void; onBack?: () => void; start?: 'in' | 'new' }) {
+  const [mode, setMode] = useState<'in' | 'new'>(start)
   const [email, setEmail] = useState('')
   const [pw, setPw] = useState('')
   const [show, setShow] = useState(false)
@@ -64,6 +64,7 @@ export default function Welcome({ onLocal }: { onLocal: () => void }) {
         <button className="btn primary huge" disabled={busy || !email || pw.length < 8} type="submit">{busy ? 'One moment…' : mode === 'new' ? 'Create my account' : 'Sign in'}</button>
         {mode === 'in' && <button type="button" className="link" onClick={forgot}>I forgot my password</button>}
         <button type="button" className="link" style={{ color: 'var(--muted)', fontSize: 15 }} onClick={onLocal}>Just use it on this device, no account</button>
+        {onBack && <button type="button" className="link" style={{ color: 'var(--muted)', fontSize: 15 }} onClick={onBack}>← Back</button>}
       </form>
     </div>
   )
