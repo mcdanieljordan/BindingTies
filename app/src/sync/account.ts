@@ -8,7 +8,7 @@ export async function currentUser() {
   return data.session?.user ?? null
 }
 export async function signUp(email: string, password: string) {
-  const { data, error } = await sb!.auth.signUp({ email, password })
+  const { data, error } = await sb!.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + import.meta.env.BASE_URL } })
   if (error) throw error
   return data
 }
