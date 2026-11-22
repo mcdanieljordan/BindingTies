@@ -85,7 +85,7 @@ export default function Landing({ onStart, onSignIn, onLocal }: { onStart: () =>
         <button className="btn primary huge" style={{ maxWidth: 380 }} onClick={onStart}>Create my free account</button>
         <button className="link" onClick={onLocal}>Or try it on this device with no account</button>
       </section>
-      <footer className="land-foot muted">FamilyOS • Made for families</footer>
+      <footer className="land-foot muted">FamilyOS • Made for families • <a href={`${import.meta.env.BASE_URL}privacy.html`}>Privacy & Terms</a></footer>
     </div>
   )
 }
