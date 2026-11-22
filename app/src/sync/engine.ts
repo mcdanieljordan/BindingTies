@@ -87,14 +87,22 @@ async function apply(recs: Rec[]) {
   })
 }
 
-async function pull(fid: string) {
+/** Bumped whenever sync starts or stops, so a pull that is still running for a previous login cannot write into the next one. */
+let gen = 0
+const EPOCH = '1970-01-01T00:00:00Z'
+
+async function pull(fid: string, g: number) {
   if (!sb) return
-  let cursor = await getKV<string>('sync:cursor', '1970-01-01T00:00:00Z')
+  let cursor = await getKV<string>('sync:cursor', EPOCH)
+  // an empty device has downloaded nothing yet, whatever an old marker says
+  if (cursor !== EPOCH && (await db.members.count()) === 0) cursor = EPOCH
   for (;;) {
     const { data, error } = await sb.from('records').select('tbl,rid,data,deleted,updated_at').eq('family_id', fid).gt('updated_at', cursor).order('updated_at').limit(300)
     if (error) throw error
+    if (g !== gen) return
     if (!data?.length) break
     await apply(data as Rec[])
+    if (g !== gen) return
     cursor = data[data.length - 1].updated_at
     await setKV('sync:cursor', cursor)
     if (data.length < 300) break
@@ -106,10 +114,12 @@ let again = false
 async function cycle(fid: string) {
   if (busy) { again = true; return }
   busy = true
+  const g = gen
   set({ state: 'syncing' })
   try {
     await push(fid)
-    await pull(fid)
+    if (g !== gen) return
+    await pull(fid, g)
     set({ state: 'ok', last: Date.now(), error: undefined, pending: await db.outbox.count() })
   } catch (e) {
     const offline = !navigator.onLine
@@ -123,6 +133,7 @@ async function cycle(fid: string) {
 let stop: (() => void) | null = null
 export function startSync(fid: string) {
   stopSync()
+  const myGen = gen
   if (!sb) return
   const kick = () => void cycle(fid)
   let debounce: number | undefined
@@ -138,7 +149,7 @@ export function startSync(fid: string) {
     .channel(`records-${fid}`)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'records', filter: `family_id=eq.${fid}` }, (p) => {
       const r = (p.new && Object.keys(p.new).length ? p.new : null) as Rec | null
-      if (r) void apply([r])
+      if (r && myGen === gen) void apply([r])
     })
     .subscribe()
   const timer = window.setInterval(kick, 60000)
@@ -151,5 +162,5 @@ export function startSync(fid: string) {
     void sub.then((s) => s.unsubscribe())
   }
 }
-export function stopSync() { stop?.(); stop = null; set({ state: 'off' }) }
+export function stopSync() { gen++; stop?.(); stop = null; set({ state: 'off' }) }
 export const syncNow = (fid: string) => cycle(fid)

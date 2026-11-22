@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bell, Download, Moon, Plus, Sun, Trash2, Upload } from 'lucide-react'
+import { Bell, Download, Moon, Plus, Send, Sun, Trash2, Upload } from 'lucide-react'
 import { db, type Member } from '../db'
 import { PageHead, MemberChip } from '../components/ui'
 import { useApp } from '../ctx'
@@ -7,6 +7,7 @@ import { useMembers } from '../lib/useData'
 import { beep, notifySupported } from '../lib/engine'
 import { AVATARS, Avatar } from '../lib/icons'
 import SyncPanel from '../sync/SyncPanel'
+import InviteModal from '../sync/InviteModal'
 
 const COLORS = ['#8d7bff', '#50e0bd', '#ff7fb2', '#ffca70', '#5db7ff', '#ff9a62', '#b6e35a', '#e08cff']
 const tables = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos', 'kv'] as const
@@ -15,7 +16,10 @@ const blobToData = (b: Blob) => new Promise<string>((res) => { const r = new Fil
 const dataToBlob = async (u: string) => (await fetch(u)).blob()
 
 export default function SettingsView() {
-  const { settings, setSettings, toast } = useApp()
+  const { settings, setSettings, toast, family } = useApp()
+  const limited = family?.status === 'approved' && family.access === 'limited'
+  const canInvite = family?.status === 'approved' && family.role !== 'member'
+  const [inviting, setInviting] = useState<Member | null>(null)
   const members = useMembers()
   const [perm, setPerm] = useState(notifySupported() ? Notification.permission : 'unsupported')
   const [nm, setNm] = useState('')
@@ -78,7 +82,7 @@ export default function SettingsView() {
           </div>
         </div>
 
-        <div className="card" style={{ marginTop: 0 }}>
+        {!limited && <div className="card" style={{ marginTop: 0 }}>
           <h3>Family</h3>
           <div className="stack" style={{ marginTop: 10 }}>
             {members.map((m) => (
@@ -88,6 +92,7 @@ export default function SettingsView() {
                 <select value={m.role} onChange={(e) => edit(m, { role: e.target.value as Member['role'] })}><option value="parent">Parent</option><option value="child">Child</option><option value="caregiver">Caregiver</option></select>
                 <input type="number" min={1} max={19} style={{ width: 62 }} placeholder="Age" value={m.age ?? ''} onChange={(e) => edit(m, { age: e.target.value ? Number(e.target.value) : undefined })} aria-label="Age" />
                 <input type="color" value={m.color} onChange={(e) => edit(m, { color: e.target.value })} aria-label="Color" />
+                {canInvite && <button className="btn sm" onClick={() => setInviting(m)}><Send size={14} />Invite</button>}
                 <button className="btn ghost sm" aria-label={`Remove ${m.name}`} onClick={() => confirm(`Remove ${m.name}? Their saved files will remain but be unassigned.`) && db.members.delete(m.id)}><Trash2 size={14} /></button>
               </div>
             ))}
@@ -95,14 +100,15 @@ export default function SettingsView() {
             <div className="row">{members.map((m) => <MemberChip key={m.id} m={m} />)}</div>
           </div>
           <h3 style={{ marginTop: 18 }}>Your data</h3>
-          <p className="muted">Everything lives on this device. No accounts, ads or trackers. Make a backup now and then.</p>
+          <p className="muted">Your family's information is saved on this device and, when you are signed in, safely in your family's private cloud space. No ads or trackers. Make a backup now and then.</p>
           <div className="row">
             <button className="btn" onClick={exportAll}><Download size={15} />Export backup</button>
             <label className="btn"><Upload size={15} />Restore backup<input type="file" accept="application/json" hidden onChange={(e) => importAll(e.target.files?.[0])} /></label>
             <button className="btn danger" onClick={async () => { if (confirm('Erase ALL FamilyOS data on this device? Export a backup first.')) { await db.delete(); location.reload() } }}>Erase everything</button>
           </div>
-        </div>
+        </div>}
       </div>
+      {inviting && <InviteModal person={inviting} onClose={() => setInviting(null)} />}
     </>
   )
 }

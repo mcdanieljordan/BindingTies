@@ -1,8 +1,10 @@
 import { sb, VAPID_PUBLIC } from './client'
 
-export interface FamilyInfo { id: string; name: string; invite_code: string; tz: string; status: 'pending' | 'approved'; member_id: number | null; role: 'owner' | 'parent' | 'member' }
-export interface JoinRequest { user_id: string; email: string; requested: string }
-export interface FamilyAccount { user_id: string; email: string; member_id: number | null; role: 'owner' | 'parent' | 'member' }
+export type Access = 'full' | 'limited'
+export interface FamilyInfo { id: string; name: string; invite_code: string; tz: string; status: 'pending' | 'approved'; member_id: number | null; role: 'owner' | 'parent' | 'member'; access?: Access }
+export interface JoinRequest { user_id: string; email: string; requested: string; requested_access?: Access }
+export interface FamilyAccount { user_id: string; email: string; member_id: number | null; role: 'owner' | 'parent' | 'member'; access?: Access }
+export interface Invite { id: string; token: string; email: string | null; access: Access; role: 'parent' | 'member'; member_id: number; created_at: string }
 
 export async function currentUser() {
   if (!sb) return null
@@ -32,8 +34,8 @@ export async function createFamily(name: string): Promise<FamilyInfo> {
   return data as FamilyInfo
 }
 /** Asks to join. The family's parents must approve before anything is shared. */
-export async function joinFamily(code: string): Promise<FamilyInfo> {
-  const { data, error } = await sb!.rpc('join_family', { p_code: code.trim().toUpperCase() })
+export async function joinFamily(code: string, access: Access = 'limited'): Promise<FamilyInfo> {
+  const { data, error } = await sb!.rpc('join_family', { p_code: code.trim().toUpperCase(), p_access: access })
   if (error) throw error
   return data as FamilyInfo
 }
@@ -47,9 +49,56 @@ export async function familyAccounts(fid: string): Promise<FamilyAccount[]> {
   if (error) throw error
   return (data as FamilyAccount[]) ?? []
 }
-export async function approveMember(fid: string, uid: string, memberId: number | null, role: 'parent' | 'member') {
-  const { error } = await sb!.rpc('approve_member', { p_family: fid, p_user: uid, p_member_id: memberId, p_role: role })
+export async function approveMember(fid: string, uid: string, memberId: number | null, role: 'parent' | 'member', access: Access = 'limited') {
+  const { error } = await sb!.rpc('approve_member', { p_family: fid, p_user: uid, p_member_id: memberId, p_role: role, p_access: access })
   if (error) throw error
+}
+export async function setMemberAccess(fid: string, uid: string, access: Access, role?: 'parent' | 'member') {
+  const { error } = await sb!.rpc('set_member_access', { p_family: fid, p_user: uid, p_access: access, p_role: role ?? null })
+  if (error) throw error
+}
+
+/* ---------- invites ---------- */
+const INVITE_KEY = 'fos-invite'
+/** An invite link looks like https://…/FamilyOS/?invite=TOKEN. Keep the token until the person has signed in. */
+export function captureInvite() {
+  try {
+    const u = new URL(location.href)
+    const t = u.searchParams.get('invite')
+    if (t) { localStorage.setItem(INVITE_KEY, t.trim()); u.searchParams.delete('invite'); history.replaceState(null, '', u.pathname + (u.search || '') + u.hash) }
+  } catch { /* ignore */ }
+}
+export const pendingInviteToken = () => { try { return localStorage.getItem(INVITE_KEY) } catch { return null } }
+const clearInvite = () => { try { localStorage.removeItem(INVITE_KEY) } catch { /* ignore */ } }
+export async function invitePreview(token: string): Promise<{ family: string; person: string | null } | null> {
+  const { data } = await sb!.rpc('invite_preview', { p_token: token })
+  return (data as { family: string; person: string | null } | null) ?? null
+}
+export async function createInvite(fid: string, memberId: number, email: string, access: Access, role: 'parent' | 'member'): Promise<Invite> {
+  const { data, error } = await sb!.rpc('create_invite', { p_family: fid, p_member: memberId, p_email: email, p_access: access, p_role: role })
+  if (error) throw error
+  return data as Invite
+}
+export async function listInvites(fid: string): Promise<Invite[]> {
+  const { data, error } = await sb!.rpc('list_invites', { p_family: fid })
+  if (error) throw error
+  return (data as Invite[]) ?? []
+}
+export async function revokeInvite(id: string) {
+  const { error } = await sb!.rpc('revoke_invite', { p_invite: id })
+  if (error) throw error
+}
+export const inviteLink = (token: string) => `${location.origin}${import.meta.env.BASE_URL}?invite=${token}`
+/** Looks for an invite that belongs to this login: the link they opened, or their verified email. */
+export async function resolveInvite(): Promise<{ fam: FamilyInfo | null; joinedByInvite: boolean }> {
+  const tok = pendingInviteToken()
+  if (tok) {
+    const { data, error } = await sb!.rpc('accept_invite', { p_token: tok })
+    if (!error && data) { clearInvite(); return { fam: data as FamilyInfo, joinedByInvite: true } }
+    if (error && /already been used|expired/i.test(error.message)) clearInvite()
+  }
+  const { data } = await sb!.rpc('claim_invites')
+  return { fam: (data as FamilyInfo | null) ?? null, joinedByInvite: !!data }
 }
 export async function denyMember(fid: string, uid: string) {
   const { error } = await sb!.rpc('deny_member', { p_family: fid, p_user: uid })

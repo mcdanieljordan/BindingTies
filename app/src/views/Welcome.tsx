@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Home } from 'lucide-react'
+import InviteBanner from '../sync/InviteBanner'
 import { googleEnabled, resetPassword, signIn, signInGoogle, signUp } from '../sync/account'
 
 const friendly = (m: string) =>
@@ -37,6 +38,7 @@ export default function Welcome({ onLocal, onBack, start = 'in' }: { onLocal: ()
       <form className="gate-card" onSubmit={(e) => { e.preventDefault(); void go() }}>
         <div className="gate-logo"><Home size={38} strokeWidth={2.6} /></div>
         <h1>Welcome to FamilyOS</h1>
+        <InviteBanner />
         <p>Your family's calendar, chores and reminders, together.</p>
 
         {googleEnabled && (

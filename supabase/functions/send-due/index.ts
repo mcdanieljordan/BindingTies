@@ -5,7 +5,7 @@ import webpush from 'npm:web-push@3.6.7'
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
 interface Rec { tbl: string; rid: string; data: Record<string, any> }
-interface Msg { key: string; title: string; body?: string; urgent?: boolean }
+interface Msg { key: string; title: string; body?: string; urgent?: boolean; who?: number[]; fullOnly?: boolean }
 
 const hm = (s: string) => { const [h, m] = s.split(':').map(Number); return h * 60 + m }
 const fmt12 = (s: string) => { const [h, m] = s.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}` }
@@ -34,7 +34,7 @@ function buildMessages(fid: string, recs: Rec[], tz: string): Msg[] {
   for (const { rid, data: e } of by('events')) {
     if (!e.start || !e.remindMin || !occursOn(e, today)) continue
     const at = hm(e.start) - e.remindMin
-    if (mins >= at && mins < at + 5) out.push({ key: `ev:${fid}:${rid}:${today}`, title: `Coming up: ${e.title}`, body: `Starts at ${fmt12(e.start)}` })
+    if (mins >= at && mins < at + 5) out.push({ key: `ev:${fid}:${rid}:${today}`, title: `Coming up: ${e.title}`, body: `Starts at ${fmt12(e.start)}`, who: (e.memberIds ?? []).map(Number) })
   }
   for (const { rid, data: a } of by('alarms')) {
     if (!a.enabled || !a.time) continue
@@ -51,8 +51,8 @@ function buildMessages(fid: string, recs: Rec[], tz: string): Msg[] {
     for (const time of m.times ?? []) {
       if (doses.some((d) => String(d.medId) === rid && d.date === today && d.time === time)) continue
       const late = mins - hm(time)
-      if (late >= 0 && late <= 30) out.push({ key: `med:${fid}:${rid}:${today}:${time}:${Math.floor(late / 10)}`, title: `💊 ${m.name} for ${who}`, body: `${m.dose ?? ''} due at ${fmt12(time)}. Mark it given in FamilyOS.`, urgent: true })
-      else if (late > 30 && late <= 120) out.push({ key: `medesc:${fid}:${rid}:${today}:${time}`, title: `Not logged yet: ${m.name} for ${who}`, body: `Due at ${fmt12(time)}. Has someone already given it? Check before giving another dose.`, urgent: true })
+      if (late >= 0 && late <= 30) out.push({ key: `med:${fid}:${rid}:${today}:${time}:${Math.floor(late / 10)}`, title: `💊 ${m.name} for ${who}`, body: `${m.dose ?? ''} due at ${fmt12(time)}. Mark it given in FamilyOS.`, urgent: true, fullOnly: true })
+      else if (late > 30 && late <= 120) out.push({ key: `medesc:${fid}:${rid}:${today}:${time}`, title: `Not logged yet: ${m.name} for ${who}`, body: `Due at ${fmt12(time)}. Has someone already given it? Check before giving another dose.`, urgent: true, fullOnly: true })
     }
   }
   return out
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
   if (!priv || !cfg.vapid_public) return new Response('VAPID keys not configured', { status: 500 })
   webpush.setVapidDetails(cfg.vapid_subject ?? 'mailto:noreply@example.com', cfg.vapid_public, priv)
 
-  const { data: subs } = await sb.from('push_subscriptions').select('id,family_id,endpoint,p256dh,auth')
+  const { data: subs } = await sb.from('push_subscriptions').select('id,user_id,family_id,endpoint,p256dh,auth')
   const famIds = [...new Set((subs ?? []).map((s) => s.family_id))]
   let sent = 0, failed = 0
   for (const fid of famIds) {
@@ -77,8 +77,18 @@ Deno.serve(async (req) => {
     // dedupe: only messages whose key we have not sent before
     const { data: fresh } = await sb.from('push_log').upsert(msgs.map((m) => ({ key: m.key })), { onConflict: 'key', ignoreDuplicates: true }).select('key')
     const freshKeys = new Set((fresh ?? []).map((r) => r.key))
+    const { data: mem } = await sb.from('family_members').select('user_id,status,role,access,member_id').eq('family_id', fid)
+    const who = new Map((mem ?? []).map((r) => [r.user_id as string, r as { status: string; role: string; access: string; member_id: number | null }]))
+    // Full accounts hear everything; Limited accounts only hear about things they are named on, never medicine
+    const wants = (uid: string, m: Msg) => {
+      const r = who.get(uid)
+      if (!r || r.status !== 'approved') return false
+      if (r.role !== 'member' || r.access === 'full') return true
+      if (m.fullOnly) return false
+      return !m.who || (r.member_id != null && m.who.includes(Number(r.member_id)))
+    }
     for (const m of msgs.filter((x) => freshKeys.has(x.key))) {
-      for (const s of (subs ?? []).filter((x) => x.family_id === fid)) {
+      for (const s of (subs ?? []).filter((x) => x.family_id === fid && wants(x.user_id, m))) {
         try {
           await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify({ title: m.title, body: m.body, tag: m.key, urgent: m.urgent, url: '/' }), { TTL: 3600, urgency: 'high' })
           sent++

@@ -21,7 +21,7 @@ import WhoIs from './views/WhoIs'
 import Pending from './views/Pending'
 import { useSession } from './sync/useSession'
 import { syncConfigured } from './sync/client'
-import { linkMember, myFamily, signOut, type FamilyInfo } from './sync/account'
+import { captureInvite, linkMember, myFamily, resolveInvite, signOut, type FamilyInfo } from './sync/account'
 import { startSync, stopSync, syncNow } from './sync/engine'
 import { useSyncStatus } from './sync/SyncPanel'
 
@@ -35,6 +35,8 @@ const NAV = [
   { id: 'vault', label: 'Learning', I: FolderHeart },
   { id: 'settings', label: 'Settings', I: Cog },
 ] as const
+
+captureInvite()
 
 const Splash = ({ text }: { text: string }) => <div className="gate"><div className="gate-card"><div className="gate-logo"><Home size={38} /></div><h1>{text}</h1></div></div>
 
@@ -82,7 +84,15 @@ export default function App() {
     void (async () => {
       const cached = await getKV<FamilyInfo | null>('sync:family', null)
       if (cached && live) setFam(cached)
-      const f = await myFamily().catch(() => cached)
+      let f = await myFamily().catch(() => cached)
+      // an invite (link or matching email) lets this login straight in
+      if (!f || f.status !== 'approved') {
+        const r = await resolveInvite().catch(() => ({ fam: null as FamilyInfo | null, joinedByInvite: false }))
+        if (r.fam) {
+          if ((await db.members.count()) > 0) { await wipeLocal(); setMeState(undefined) }
+          f = r.fam
+        }
+      }
       if (!live) return
       setFam(f ?? null)
       await setKV('sync:family', f ?? null)
@@ -105,6 +115,8 @@ export default function App() {
   }
 
   if (!loaded || members === undefined || me === null) return null
+  const limited = fam?.status === 'approved' && fam.access === 'limited'
+  const nav = NAV.filter((n) => !(limited && n.id === 'vault'))
   const ctx = { settings, setSettings, toast, go: setView, openWall: () => setWall(true), me: me ?? undefined, setMe, leaveFamily, family: fam ?? undefined }
   const wrap = (el: React.ReactNode) => <AppCtx.Provider value={ctx}>{el}</AppCtx.Provider>
 
@@ -137,7 +149,7 @@ export default function App() {
       <div className="shell">
         <aside className="sidebar no-print">
           <div className="brand"><span className="brand-icon"><Home size={19} strokeWidth={2.6} /></span>FamilyOS</div>
-          {NAV.map(({ id, label, I }) => (
+          {nav.map(({ id, label, I }) => (
             <button key={id} className={`nav-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)}><I size={19} />{label}</button>
           ))}
           <div className="sp" />
@@ -151,11 +163,11 @@ export default function App() {
           {view === 'family' && <Family />}
           {view === 'care' && <Care />}
           {view === 'lists' && <Lists />}
-          {view === 'vault' && <Vault />}
+          {view === 'vault' && !limited && <Vault />}
           {view === 'settings' && <SettingsView />}
         </main>
         <nav className="bottom-nav no-print" aria-label="Main">
-          {NAV.slice(0, 7).map(({ id, label, I }) => (
+          {nav.filter((n) => n.id !== 'settings').map(({ id, label, I }) => (
             <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><I size={21} />{label.split(' ')[0]}</button>
           ))}
           <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}><Cog size={21} />More</button>

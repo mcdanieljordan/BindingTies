@@ -1,5 +1,6 @@
 import { CalendarDays, ListChecks, Trophy, Pill, FolderHeart, MonitorPlay, Check, Home, ShieldCheck, Printer, Users } from 'lucide-react'
 import { googleEnabled, signInGoogle } from '../sync/account'
+import InviteBanner from '../sync/InviteBanner'
 
 const FEATURES = [
   { I: CalendarDays, t: 'One family calendar', d: 'Everyone sees the same schedule. Type "Soccer Tuesday 5pm" and it is added.' },
@@ -17,6 +18,7 @@ export default function Landing({ onStart, onSignIn, onLocal }: { onStart: () =>
         <div className="brand"><span className="brand-icon"><Home size={19} strokeWidth={2.6} /></span>FamilyOS</div>
         <button className="btn" onClick={onSignIn}>Sign in</button>
       </header>
+      <InviteBanner />
 
       <section className="land-hero">
         <div className="land-copy">

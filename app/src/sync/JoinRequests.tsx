@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { UserPlus } from 'lucide-react'
-import { approveMember, denyMember, pendingRequests, type JoinRequest } from './account'
+import { approveMember, denyMember, pendingRequests, type Access, type JoinRequest } from './account'
 import { useApp } from '../ctx'
 import { useMembers } from '../lib/useData'
 import { Modal } from '../components/ui'
@@ -14,13 +14,14 @@ export default function JoinRequests() {
   const [pick, setPick] = useState<JoinRequest | null>(null)
   const [person, setPerson] = useState<string>('')
   const [role, setRole] = useState<'parent' | 'member'>('member')
+  const [access, setAccess] = useState<Access>('limited')
   const isParent = family?.status === 'approved' && family.role !== 'member'
 
   const load = useCallback(async () => { if (family && isParent) setList(await pendingRequests(family.id).catch(() => [])) }, [family, isParent])
   useEffect(() => { void load(); const t = setInterval(load, 15000); return () => clearInterval(t) }, [load])
   if (!family || !isParent || list.length === 0) return null
 
-  const open = (r: JoinRequest) => { setPick(r); setPerson(''); setRole('member') }
+  const open = (r: JoinRequest) => { setPick(r); setPerson(''); setRole('member'); setAccess(r.requested_access ?? 'limited') }
   const choosePerson = (id: string) => { setPerson(id); const m = members.find((x) => String(x.id) === id); setRole(m && m.role !== 'child' ? 'parent' : 'member') }
 
   return (
@@ -30,7 +31,7 @@ export default function JoinRequests() {
         <div className="stack" style={{ marginTop: 10 }}>
           {list.map((r) => (
             <div className="item" key={r.user_id}>
-              <div className="grow"><div className="title" style={{ fontSize: 18 }}>{r.email}</div><div className="muted">Entered your family code</div></div>
+              <div className="grow"><div className="title" style={{ fontSize: 18 }}>{r.email}</div><div className="muted">Entered your family code • asked for {r.requested_access === 'full' ? 'Full' : 'Limited'} access</div></div>
               <button className="btn mint" onClick={() => open(r)}>Review</button>
               <button className="btn" onClick={async () => { if (confirm(`Say no to ${r.email}?`)) { await denyMember(family.id, r.user_id); void load() } }}>No</button>
             </div>
@@ -54,8 +55,18 @@ export default function JoinRequests() {
               <button className={role === 'member' ? 'on' : ''} onClick={() => setRole('member')}>Family member</button>
               <button className={role === 'parent' ? 'on' : ''} onClick={() => setRole('parent')}>Parent (can approve others)</button>
             </div>
+            {role !== 'parent' && (
+              <div className="stack" style={{ gap: 4 }}>
+                <b>What can they see?</b>
+                <div className="seg" style={{ alignSelf: 'flex-start' }}>
+                  <button className={access === 'limited' ? 'on' : ''} onClick={() => setAccess('limited')}>Limited</button>
+                  <button className={access === 'full' ? 'on' : ''} onClick={() => setAccess('full')}>Full</button>
+                </div>
+                <span className="muted small">{access === 'limited' ? 'Only what they are named on, plus points, the team quest and shared lists.' : 'Everything, including medicine and the Learning vault.'}</span>
+              </div>
+            )}
             <button className="btn primary huge" onClick={async () => {
-              try { await approveMember(family.id, pick.user_id, person ? Number(person) : null, role); toast({ title: 'Welcome!', body: `${pick.email} is in.` }); setPick(null); void load() }
+              try { await approveMember(family.id, pick.user_id, person ? Number(person) : null, role, access); toast({ title: 'Welcome!', body: `${pick.email} is in.` }); setPick(null); void load() }
               catch (e) { toast({ title: 'Could not approve', body: (e as Error).message, kind: 'warn' }) }
             }}>Yes, let them in</button>
           </div>

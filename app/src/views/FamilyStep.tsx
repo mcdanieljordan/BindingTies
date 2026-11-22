@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Users, KeyRound } from 'lucide-react'
-import { createFamily, joinFamily, signOut, type FamilyInfo } from '../sync/account'
+import { createFamily, joinFamily, signOut, type Access, type FamilyInfo } from '../sync/account'
 import { db, wipeLocal } from '../db'
 
 export default function FamilyStep({ email, onDone }: { email?: string; onDone: (f: FamilyInfo, joined: boolean) => void }) {
   const [name, setName] = useState('Our family')
   const [code, setCode] = useState('')
+  const [access, setAccess] = useState<Access>('limited')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
@@ -16,7 +17,7 @@ export default function FamilyStep({ email, onDone }: { email?: string; onDone: 
   async function join() {
     setBusy(true); setErr('')
     try {
-      const f = await joinFamily(code)
+      const f = await joinFamily(code, access)
       // anything already on this device would mix with the family's data
       if ((await db.members.count()) > 0) await wipeLocal()
       onDone(f, true)
@@ -34,6 +35,14 @@ export default function FamilyStep({ email, onDone }: { email?: string; onDone: 
           <h2 style={{ fontSize: 22 }}>Yes, I have a code</h2>
           <p style={{ textAlign: 'left', fontSize: 16, margin: '6px 0 12px' }}>Ask them to open <b>Settings</b> and read you the family code.</p>
           <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="Family code" aria-label="Family code" autoCapitalize="characters" style={{ textAlign: 'center', letterSpacing: 4, fontWeight: 800 }} />
+          <div className="stack" style={{ gap: 4, marginTop: 12, textAlign: 'left' }}>
+            <b style={{ fontSize: 16 }}>What do you need?</b>
+            <div className="seg" style={{ alignSelf: 'stretch' }}>
+              <button type="button" className={access === 'limited' ? 'on' : ''} onClick={() => setAccess('limited')}>Limited</button>
+              <button type="button" className={access === 'full' ? 'on' : ''} onClick={() => setAccess('full')}>Full family</button>
+            </div>
+            <span className="muted" style={{ fontSize: 14 }}>{access === 'limited' ? 'Just what you are named on: your events, routines and points.' : 'Everything, like a parent would see. A parent has to approve this.'}</span>
+          </div>
           <button className="btn primary huge" style={{ marginTop: 12 }} disabled={busy || code.trim().length < 4} onClick={join}><KeyRound size={20} />Join my family</button>
         </div>
 

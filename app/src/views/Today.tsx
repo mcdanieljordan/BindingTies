@@ -9,7 +9,8 @@ import { Ico } from '../lib/icons'
 import JoinRequests from '../sync/JoinRequests'
 
 export default function Today() {
-  const { go } = useApp()
+  const { go, family } = useApp()
+  const limited = family?.status === 'approved' && family.access === 'limited'
   const today = todayStr()
   const members = useMembers()
   const events = useEvents()
@@ -71,7 +72,7 @@ export default function Today() {
           </div>
         </div>
 
-        <div className="card" style={{ marginTop: 0 }}>
+        {!limited && <div className="card" style={{ marginTop: 0 }}>
           <div className="row between"><h3><Pill size={16} style={{ verticalAlign: -2 }} /> Still to give today</h3><button className="btn sm" onClick={() => go('care')}>Open</button></div>
           <div className="stack" style={{ marginTop: 10 }}>
             {pendingMeds.length === 0 && <Empty>All caught up on medicine and vitamins.</Empty>}
@@ -79,7 +80,7 @@ export default function Today() {
               <div className="item" key={m.id + t}><Ico k="medicine" /><div className="grow"><div className="title">{m.name} • {m.dose}</div><div className="muted">{mem(m.memberId)?.name} at {fmtTime(t)}</div></div></div>
             ))}
           </div>
-        </div>
+        </div>}
 
         <div className="card" style={{ marginTop: 0 }}>
           <div className="row between"><h3><Hand size={16} style={{ verticalAlign: -2 }} /> Up for grabs</h3><button className="btn sm" onClick={() => go('family')}>Open</button></div>

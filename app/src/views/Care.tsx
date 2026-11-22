@@ -8,12 +8,14 @@ import { fmtMs } from '../lib/engine'
 import { useApp } from '../ctx'
 
 export default function Care() {
-  const [tab, setTab] = useState<'meds' | 'timers' | 'alarms'>('meds')
+  const { family } = useApp()
+  const limited = family?.status === 'approved' && family.access === 'limited'
+  const [tab, setTab] = useState<'meds' | 'timers' | 'alarms'>(limited ? 'timers' : 'meds')
   return (
     <>
-      <PageHead title="Care & time" sub="Medicine log, countdown timers and repeating alarms." />
+      <PageHead title="Care & time" sub={limited ? 'Countdown timers and repeating alarms.' : 'Medicine log, countdown timers and repeating alarms.'} />
       <div className="tabs">
-        <button className={`tab ${tab === 'meds' ? 'on' : ''}`} onClick={() => setTab('meds')}><Pill size={14} style={{ verticalAlign: -2 }} /> Medicine</button>
+        {!limited && <button className={`tab ${tab === 'meds' ? 'on' : ''}`} onClick={() => setTab('meds')}><Pill size={14} style={{ verticalAlign: -2 }} /> Medicine</button>}
         <button className={`tab ${tab === 'timers' ? 'on' : ''}`} onClick={() => setTab('timers')}><TimerIcon size={14} style={{ verticalAlign: -2 }} /> Timers</button>
         <button className={`tab ${tab === 'alarms' ? 'on' : ''}`} onClick={() => setTab('alarms')}><AlarmClock size={14} style={{ verticalAlign: -2 }} /> Alarms</button>
       </div>
