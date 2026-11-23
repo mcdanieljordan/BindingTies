@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "920465592737",
+    "project_id": "familyos-4e110",
+    "storage_bucket": "familyos-4e110.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:920465592737:android:d4a429bbbba6295d69fbe0",
+        "android_client_info": {
+          "package_name": "com.bindingties.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOru7U71PIkT16-GYLDJtbgBNK39sySLg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
