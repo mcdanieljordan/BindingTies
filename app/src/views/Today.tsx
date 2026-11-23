@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { CalendarDays, ListChecks, Pill, Trophy, Hand, Timer as TimerIcon } from 'lucide-react'
 import { PageHead, MemberChip, Empty } from '../components/ui'
 import { useApp } from '../ctx'
+import { turnOf } from '../lib/chores'
 import { useChores, useDoses, useEvents, useMembers, useMeds, useRoutines, useRuns, useTimers } from '../lib/useData'
 import { eventsOn, fmtTime, fmtDate, greeting, todayStr } from '../lib/dates'
 import { questProgress } from '../lib/engine'
@@ -26,7 +27,8 @@ export default function Today() {
   const todays = eventsOn(events, today)
   const dueRoutines = routines.filter((r) => r.days.includes(dow))
   const pendingMeds = meds.filter((m) => m.active).flatMap((m) => m.times.map((t) => ({ m, t }))).filter(({ m, t }) => !doses.some((d) => d.medId === m.id && d.time === t)).sort((a, b) => a.t.localeCompare(b.t))
-  const open = chores.filter((c) => !c.assigneeId && c.doneDate !== today)
+  const alive = new Set(members.map((m) => m.id))
+  const open = chores.filter((c) => !turnOf(c, today, alive) && c.doneDate !== today)
   const running = timers.filter((t) => !t.done)
 
   return (

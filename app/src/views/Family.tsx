@@ -8,6 +8,7 @@ import { award, celebrate, pointScale, questProgress, weekStart } from '../lib/e
 import { todayStr, fmtDate, ymd } from '../lib/dates'
 import { CHORE_PRESETS } from '../lib/seed'
 import { awards, standings } from '../lib/board'
+import { nextTurnOf, rotationAnchor, turnOf } from '../lib/chores'
 import { useApp } from '../ctx'
 
 const BADGES = [
@@ -37,6 +38,7 @@ export default function Family() {
   const mem = (id?: number) => members.find((m) => m.id === id)
   const kids = members.filter((m) => m.role !== 'caregiver')
   const wk = weekStart()
+  const alive = new Set(members.map((m) => m.id))
   const total = (id: number) => ledger.filter((e) => e.memberId === id).reduce((s, e) => s + e.points, 0)
   const daysActive = (id: number) => new Set(ledger.filter((e) => e.memberId === id && e.points > 0 && new Date(e.ts).toISOString().slice(0, 10) >= wk).map((e) => new Date(e.ts).toDateString())).size
   const done = prog && prog.total >= prog.quest.target
@@ -65,7 +67,15 @@ export default function Family() {
   const notYet = (c: Chore) => db.chores.update(c.id, { pendingBy: undefined, pendingTs: undefined })
   async function saveChore() {
     if (!chore?.title?.trim()) return
-    const rec = { title: chore.title.trim(), points: Math.max(1, Number(chore.points) || 1), repeat: chore.repeat ?? 'daily', assigneeId: chore.assigneeId }
+    const repeat = chore.repeat ?? 'daily'
+    const turns = chore.rotate && repeat !== 'none' && chore.rotate.length >= 2 ? chore.rotate : undefined
+    const old = chore.id ? chores.find((c) => c.id === chore.id) : undefined
+    const same = !!old && !!turns && old.repeat === repeat && JSON.stringify(old.rotate) === JSON.stringify(turns)
+    const rec = {
+      title: chore.title.trim(), points: Math.max(1, Number(chore.points) || 1), repeat,
+      assigneeId: turns ? undefined : chore.assigneeId,
+      rotate: turns, rotateFrom: turns ? (same ? old!.rotateFrom : rotationAnchor(repeat, today)) : undefined, rotateShift: turns && same ? old!.rotateShift : undefined,
+    }
     if (chore.id) await db.chores.update(chore.id, rec)
     else await db.chores.add(rec as never)
     if (saveTpl && !templates.some((t) => t.title.toLowerCase() === rec.title.toLowerCase() && t.points === rec.points)) {
@@ -188,12 +198,15 @@ export default function Family() {
             {chores.map((c) => {
               const d = isDone(c)
               const wait = !!c.pendingBy && !d
+              const turn = turnOf(c, today, alive)
+              const next = nextTurnOf(c, today, alive)
               return (
                 <div key={c.id} className={`item ${d ? 'done' : ''}`}>
                   <div className="grow" style={isParent ? { cursor: 'pointer' } : undefined} onClick={() => isParent && (setSaveTpl(false), setChore(c))}><div className="title">{c.title}</div>
-                    <div className="muted">{c.assigneeId ? `For ${mem(c.assigneeId)?.name}` : 'Up for grabs'} • {c.repeat === 'none' ? 'once' : c.repeat}{d && c.doneBy ? ` • done by ${mem(c.doneBy)?.name}` : ''}</div></div>
+                    <div className="muted">{next ? `🔄 ${mem(turn)?.name}'s turn (then ${mem(next)?.name})` : turn ? `For ${mem(turn)?.name}` : 'Up for grabs'} • {c.repeat === 'none' ? 'once' : c.repeat}{d && c.doneBy ? ` • done by ${mem(c.doneBy)?.name}` : ''}</div></div>
                   <span className="chip good">+{c.points}</span>
-                  {d ? <span className="chip">✓</span> : wait ? <span className="chip">⏳ {mem(c.pendingBy)?.name}</span> : c.assigneeId ? <button className="btn sm mint" onClick={() => complete(c, c.assigneeId!)}>Done</button> : <button className="btn sm mint" onClick={() => setClaim(c.id)}>I did it</button>}
+                  {d ? <span className="chip">✓</span> : wait ? <span className="chip">⏳ {mem(c.pendingBy)?.name}</span> : turn ? <button className="btn sm mint" onClick={() => complete(c, turn)}>Done</button> : <button className="btn sm mint" onClick={() => setClaim(c.id)}>I did it</button>}
+                  {isParent && next && !d && !wait && <button className="btn ghost sm" title="Skip this turn" aria-label={`Skip ${mem(turn)?.name}'s turn`} onClick={() => db.chores.update(c.id, { rotateShift: (c.rotateShift ?? 0) + 1 })}>Skip</button>}
                   {isParent && <button className="btn ghost sm" aria-label="Delete chore" onClick={() => confirm(`Delete "${c.title}"?`) && db.chores.delete(c.id)}><Trash2 size={14} /></button>}
                 </div>
               )
@@ -270,12 +283,31 @@ export default function Family() {
             <div className="row">
               <label className="f">Points<input type="number" min={1} value={chore.points} onChange={(e) => setChore({ ...chore, points: Number(e.target.value) })} /></label>
               <label className="f">Repeats<select value={chore.repeat} onChange={(e) => setChore({ ...chore, repeat: e.target.value as Chore['repeat'] })}><option value="none">Once</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label>
-              <label className="f">Who<MemberPick any anyLabel="Up for grabs" members={kids} value={chore.assigneeId} onChange={(v) => setChore({ ...chore, assigneeId: v })} /></label>
+              <label className="f">Who
+                <select value={chore.rotate ? 'turns' : chore.assigneeId ?? ''} onChange={(e) => { const v = e.target.value; setChore(v === 'turns' ? { ...chore, rotate: chore.rotate ?? [], assigneeId: undefined } : { ...chore, rotate: undefined, assigneeId: v ? Number(v) : undefined }) }}>
+                  <option value="">Up for grabs</option>
+                  {kids.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  <option value="turns">🔄 Take turns…</option>
+                </select>
+              </label>
             </div>
+            {chore.rotate && (
+              <div className="stack" style={{ gap: 6 }}>
+                <div className="muted">Pick who takes turns, in order. The turn moves on every {chore.repeat === 'weekly' ? 'week' : 'day'}.</div>
+                <div className="row">
+                  {kids.map((m) => {
+                    const pos = chore.rotate!.indexOf(m.id)
+                    return <button key={m.id} type="button" className={`tab ${pos >= 0 ? 'on' : ''}`} onClick={() => setChore({ ...chore, rotate: pos >= 0 ? chore.rotate!.filter((x) => x !== m.id) : [...chore.rotate!, m.id] })}>{pos >= 0 ? `${pos + 1}. ` : ''}{m.name}</button>
+                  })}
+                </div>
+                {chore.repeat === 'none' && <div className="err">Taking turns needs a daily or weekly chore. Change "Repeats" above.</div>}
+                {chore.repeat !== 'none' && chore.rotate.length < 2 && <div className="muted small">Choose at least two people.</div>}
+              </div>
+            )}
             <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={saveTpl} onChange={(e) => setSaveTpl(e.target.checked)} /> Save as a template to reuse</label>
             <div className="row between">
               {chore.id ? <button className="btn ghost" onClick={async () => { if (confirm(`Delete "${chore.title}"?`)) { await db.chores.delete(chore.id!); setChore(null) } }}><Trash2 size={14} /> Delete</button> : <span />}
-              <button className="btn primary" disabled={!chore.title?.trim()} onClick={saveChore}>{chore.id ? 'Save changes' : 'Add chore'}</button>
+              <button className="btn primary" disabled={!chore.title?.trim() || (!!chore.rotate && (chore.repeat === 'none' || chore.rotate.length < 2))} onClick={saveChore}>{chore.id ? 'Save changes' : 'Add chore'}</button>
             </div>
           </div>
         </Modal>

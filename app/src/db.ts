@@ -77,6 +77,11 @@ export interface Chore {
   /** a child says they did it; a parent must approve before points count */
   pendingBy?: number
   pendingTs?: number
+  /** take turns: these people, in order. The turn moves on every day (daily chores) or week (weekly chores) */
+  rotate?: number[]
+  rotateFrom?: string
+  /** how many turns a parent has skipped ahead */
+  rotateShift?: number
 }
 export interface ChoreTemplate { id: string; title: string; points: number; repeat: Repeat }
 export interface Prefs { requireApproval: boolean; board: 'team' | 'friendly' }
