@@ -83,6 +83,26 @@ export interface Chore {
   /** how many turns a parent has skipped ahead */
   rotateShift?: number
 }
+/* ---------- journal ---------- */
+export interface JournalGoal { id: string; text: string; done: boolean }
+export interface JournalEntry {
+  id: number
+  /** the person who wrote it (only their own sign-in can write it) */
+  ownerMemberId: number
+  date: string // YYYY-MM-DD, can be in the future (plans, goals)
+  kind: 'note' | 'plan'
+  title?: string
+  body: string
+  goals: JournalGoal[]
+  /** people who may read it */
+  shareWith: number[]
+  /** parents may read it (children can switch this off to keep an entry private) */
+  shareParents: boolean
+  createdAt: number
+  updatedAt: number
+}
+/** one row per child; a parent can switch on reading for a child under 15 */
+export interface JournalPolicy { id: number; parentsRead: boolean }
 export interface ChoreTemplate { id: string; title: string; points: number; repeat: Repeat }
 export interface Prefs { requireApproval: boolean; board: 'team' | 'friendly' }
 export const DEFAULT_PREFS: Prefs = { requireApproval: true, board: 'friendly' }
@@ -183,6 +203,8 @@ export const db = new Dexie('familyos-v2') as Dexie & {
   vault: EntityTable<VaultDoc, 'id'>
   goals: EntityTable<Goal, 'id'>
   photos: EntityTable<PhotoBlob, 'id'>
+  journal: EntityTable<JournalEntry, 'id'>
+  policy: EntityTable<JournalPolicy, 'id'>
   kv: EntityTable<KV, 'key'>
 }
 
@@ -207,9 +229,11 @@ db.version(1).stores({
   outbox: '++seq, [tbl+rid]',
 })
 
+db.version(2).stores({ journal: 'id, date, ownerMemberId', policy: 'id' })
+
 /* Random ids that stay unique across devices (fits safely in a JS number). */
 export const newId = () => Math.floor(Math.random() * 2 ** 48) + 1
-export const SYNCED = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos'] as const
+export const SYNCED = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos', 'journal', 'policy'] as const
 export const SYNCED_KV = ['quest', 'feeds', 'prefs', 'choreTemplates']
 
 const isRemote = () => !!(Dexie.currentTransaction as unknown as { remote?: boolean } | null)?.remote

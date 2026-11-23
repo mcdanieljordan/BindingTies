@@ -14,6 +14,9 @@ export interface Ctx {
   /** The cloud family this account belongs to (undefined when using the app without an account) */
   family?: FamilyInfo
   setMe: (id: number | undefined) => void
+  /** jump to the journal, on a day or to one entry */
+  openJournal: (date: string, id?: number) => void
+  journalFocus?: { date: string; id?: number; seq: number }
   /** Sign out of the cloud family and clear this device */
   leaveFamily: () => Promise<void>
 }

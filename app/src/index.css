@@ -239,3 +239,9 @@ label.f > input, label.f > select, label.f > textarea { color: var(--ink); font-
   .bottom-nav { overflow-x: visible; }
   .bottom-nav button { padding: 4px 2px; font-size: 11px; min-width: 0; }
 }
+
+.jmark { position: absolute; top: 3px; right: 4px; font-size: 11px; line-height: 1; }
+.cal .day { position: relative; }
+.jclamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+/* in a vertical stack a field must not stretch to its flex-basis height */
+.stack > label.f { flex: none; }

@@ -1,6 +1,6 @@
 import { Dexie } from 'dexie'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { db, getKV, setKV, SYNCED, SYNCED_KV } from '../db'
+import { db, getKV, setKV, SYNCED, SYNCED_KV, type JournalEntry } from '../db'
 import { sb } from './client'
 
 export type SyncState = 'off' | 'syncing' | 'ok' | 'offline' | 'error'
@@ -109,6 +109,32 @@ async function pull(fid: string, g: number) {
   }
 }
 
+/** Journal entries can become readable (a parent switches on reading, an author shares an old entry) or stop being readable
+ *  without the row itself changing, so the "changed since last time" pull misses it. Compare what this account can see with
+ *  what this device holds: download what is missing, remove what is no longer allowed. */
+async function reconcileJournal(fid: string, g: number) {
+  if (!sb) return
+  const { data, error } = await sb.from('records').select('rid').eq('family_id', fid).eq('tbl', 'journal').eq('deleted', false).limit(5000)
+  if (error || !data || g !== gen) return
+  const visible = new Set(data.map((r) => Number(r.rid)))
+  const pending = new Set((await db.outbox.toArray()).filter((o) => o.tbl === 'journal').map((o) => Number(o.rid)))
+  const local = new Set((await db.journal.toArray()).map((e) => e.id))
+  const stale = [...local].filter((id) => !visible.has(id) && !pending.has(id))
+  const missing = [...visible].filter((id) => !local.has(id) && !pending.has(id))
+  const rows: JournalEntry[] = []
+  for (let i = 0; i < missing.length; i += 100) {
+    const { data: got, error: e2 } = await sb.from('records').select('rid,data').eq('family_id', fid).eq('tbl', 'journal').eq('deleted', false).in('rid', missing.slice(i, i + 100).map(String))
+    if (e2) return
+    for (const r of got ?? []) if (r.data) rows.push(r.data as JournalEntry)
+  }
+  if (g !== gen || (!stale.length && !rows.length)) return
+  await db.transaction('rw', db.tables, async () => {
+    ;(Dexie.currentTransaction as unknown as { remote: boolean }).remote = true
+    if (stale.length) await db.journal.bulkDelete(stale)
+    if (rows.length) await db.journal.bulkPut(rows)
+  })
+}
+
 let busy = false
 let again = false
 async function cycle(fid: string) {
@@ -120,6 +146,7 @@ async function cycle(fid: string) {
     await push(fid)
     if (g !== gen) return
     await pull(fid, g)
+    await reconcileJournal(fid, g)
     set({ state: 'ok', last: Date.now(), error: undefined, pending: await db.outbox.count() })
   } catch (e) {
     const offline = !navigator.onLine

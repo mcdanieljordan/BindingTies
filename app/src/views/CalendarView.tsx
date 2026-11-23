@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { CalendarPlus, ChevronLeft, Copy, ChevronRight, Plus, Trash2, Wand2 } from 'lucide-react'
+import { BookOpen, CalendarPlus, ChevronLeft, Copy, ChevronRight, Plus, Trash2, Wand2 } from 'lucide-react'
 import * as chrono from 'chrono-node'
 import { db, type EventItem, type Repeat } from '../db'
 import ImportCalendar from '../components/ImportCalendar'
 import { useApp } from '../ctx'
 import { Modal, PageHead, MemberChip, Empty, MemberPick } from '../components/ui'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { canSee } from '../lib/journal'
 import { useEvents, useMembers } from '../lib/useData'
 import { DOW, eventsOn, fmtDate, fmtTime, pad, todayStr, ymd } from '../lib/dates'
 
@@ -20,6 +22,15 @@ export default function CalendarView() {
   const [imp, setImp] = useState(false)
   const [copying, setCopying] = useState(false)
   const app = useApp()
+  // each person decides whether their journal shows on the calendar (kept on this device)
+  const jKey = `fos-jcal-${app.me ?? 'x'}`
+  const [jOn, setJOn] = useState(() => { try { return localStorage.getItem(jKey) === '1' } catch { return false } })
+  const flipJ = () => { const n = !jOn; setJOn(n); try { localStorage.setItem(jKey, n ? '1' : '0') } catch { /* ignore */ } }
+  const jEntries = useLiveQuery(() => db.journal.toArray(), [], [])
+  const jPolicies = useLiveQuery(() => db.policy.toArray(), [], [])
+  const meM = members.find((m) => m.id === app.me)
+  const jByDay = new Map<string, typeof jEntries>()
+  if (jOn) for (const e of jEntries) if (canSee(e, meM, members, jPolicies)) jByDay.set(e.date, [...(jByDay.get(e.date) ?? []), e])
   const mem = (id?: number) => members.find((m) => m.id === id)
 
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
@@ -68,6 +79,7 @@ export default function CalendarView() {
   return (
     <>
       <PageHead title="Family calendar" sub="Type a sentence, check it, save it.">
+        <button className={`btn ${jOn ? 'primary' : ''}`} aria-pressed={jOn} onClick={flipJ} title="Show my journal on the calendar"><BookOpen size={16} />Journal {jOn ? 'on' : 'off'}</button>
         {app.family?.access !== 'limited' && <button className="btn" onClick={() => setImp(true)}><CalendarPlus size={16} />Import / follow</button>}
         <button className="btn primary" onClick={() => setEdit(blank(sel))}><Plus size={16} />Add event</button>
       </PageHead>
@@ -94,6 +106,7 @@ export default function CalendarView() {
               return (
                 <button key={s} className={`day ${d.getMonth() !== cursor.getMonth() ? 'out' : ''} ${s === todayStr() ? 'today' : ''} ${s === sel ? 'sel' : ''}`} onClick={() => setSel(s)} aria-label={`${fmtDate(s)}, ${evs.length} events`}>
                   <span className="n">{d.getDate()}</span>
+                  {jByDay.has(s) && <span className="jmark" aria-label="Journal entry">📓</span>}
                   <span className="dots">{evs.slice(0, 6).map((e) => <span key={e.id} className="dot" style={{ background: mem(e.memberIds[0])?.color ?? 'var(--primary)', width: 8, height: 8 }} />)}</span>
                 </button>
               )
@@ -103,6 +116,16 @@ export default function CalendarView() {
 
         <div className="card" style={{ marginTop: 0 }}>
           <h3>{fmtDate(sel, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
+          {jOn && (jByDay.get(sel) ?? []).length > 0 && (
+            <div className="stack" style={{ marginTop: 10, gap: 6 }}>
+              <div className="muted" style={{ fontWeight: 800 }}>📓 Journal</div>
+              {(jByDay.get(sel) ?? []).map((e) => (
+                <button key={e.id} className="item" style={{ textAlign: 'left', cursor: 'pointer', width: '100%' }} onClick={() => app.openJournal(e.date, e.id)}>
+                  <div className="grow"><div className="title">{e.title || (e.body.split('\n').find((l) => l.trim()) ?? 'Goals').slice(0, 60)}</div><div className="muted small">{e.kind === 'plan' ? '🎯 Plan' : 'Journal'}{e.ownerMemberId !== app.me ? ` • from ${mem(e.ownerMemberId)?.name ?? 'someone'}` : ''}</div></div>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="stack" style={{ marginTop: 10 }}>
             {dayEvents.length === 0 && <Empty>No events this day.</Empty>}
             {dayEvents.map((e) => (

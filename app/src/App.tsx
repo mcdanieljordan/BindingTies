@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Home, CalendarDays, ListChecks, Trophy, HeartPulse, ShoppingBasket, FolderHeart, Settings as Cog, MonitorPlay, Users, Menu } from 'lucide-react'
+import { BookOpen, Home, CalendarDays, ListChecks, Trophy, HeartPulse, ShoppingBasket, FolderHeart, Settings as Cog, MonitorPlay, Users, Menu } from 'lucide-react'
 import { AppCtx } from './ctx'
 import { DEFAULT_SETTINGS, loadSettings, startScheduler, type Settings, type Toast } from './lib/engine'
 import { db, getKV, setKV, wipeLocal } from './db'
@@ -11,6 +11,7 @@ import Family from './views/Family'
 import Care from './views/Care'
 import Lists from './views/Lists'
 import Vault from './views/Vault'
+import Journal from './views/Journal'
 import SettingsView from './views/SettingsView'
 import Wall from './views/Wall'
 import Onboarding from './views/Onboarding'
@@ -31,6 +32,7 @@ import ImportCalendar from './components/ImportCalendar'
 const NAV = [
   { id: 'today', label: 'Today', I: Home },
   { id: 'calendar', label: 'Calendar', I: CalendarDays },
+  { id: 'journal', label: 'Journal', I: BookOpen },
   { id: 'routines', label: 'Routines', I: ListChecks },
   { id: 'family', label: 'Team Quest', I: Trophy },
   { id: 'care', label: 'Care & Time', I: HeartPulse },
@@ -40,7 +42,7 @@ const NAV = [
 ] as const
 
 // the phone's bottom bar shows these; everything else lives under "More"
-const MAIN: string[] = ['today', 'calendar', 'routines', 'family']
+const MAIN: string[] = ['today', 'calendar', 'routines', 'journal', 'family']
 const MORE_HINT: Record<string, string> = { care: 'Medicine, timers and alarms', lists: 'Groceries and shared lists', vault: 'School files, grades and goals', settings: 'People, look and feel, alerts, backup' }
 captureInvite()
 listenForAuthLink(finishNativeAuth)
@@ -57,6 +59,7 @@ export default function App() {
   const [fam, setFam] = useState<FamilyInfo | null | undefined>(undefined) // undefined = checking
   const [waited, setWaited] = useState(false)
   const [view, setView] = useState<string>('today')
+  const [jfocus, setJfocus] = useState<{ date: string; id?: number; seq: number } | undefined>()
   const [icsText, setIcsText] = useState<string | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [wall, setWall] = useState(false)
@@ -135,7 +138,7 @@ export default function App() {
   if (!loaded || members === undefined || me === null) return null
   const limited = fam?.status === 'approved' && fam.access === 'limited'
   const nav = NAV.filter((n) => !(limited && n.id === 'vault'))
-  const ctx = { settings, setSettings, toast, go: setView, openWall: () => setWall(true), me: me ?? undefined, setMe, leaveFamily, family: fam ?? undefined }
+  const ctx = { settings, setSettings, toast, go: setView, openWall: () => setWall(true), me: me ?? undefined, setMe, openJournal: (date: string, id?: number) => { setJfocus({ date, id, seq: Date.now() }); setView('journal') }, journalFocus: jfocus, leaveFamily, family: fam ?? undefined }
   const wrap = (el: React.ReactNode) => <AppCtx.Provider value={ctx}>{el}</AppCtx.Provider>
 
   // ---- front door ----
@@ -182,6 +185,7 @@ export default function App() {
           {view === 'care' && <Care />}
           {view === 'lists' && <Lists />}
           {view === 'vault' && !limited && <Vault />}
+          {view === 'journal' && <Journal />}
           {view === 'settings' && <SettingsView />}
           {view === 'more' && (
             <>

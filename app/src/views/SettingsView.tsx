@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Bell, Download, Moon, Plus, Send, Sun, Trash2, Upload } from 'lucide-react'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Member } from '../db'
+import { isMinor } from '../lib/journal'
 import { PageHead } from '../components/ui'
 import { useApp } from '../ctx'
 import { isNative } from '../lib/native'
@@ -11,17 +13,21 @@ import SyncPanel from '../sync/SyncPanel'
 import InviteModal from '../sync/InviteModal'
 
 const COLORS = ['#8d7bff', '#50e0bd', '#ff7fb2', '#ffca70', '#5db7ff', '#ff9a62', '#b6e35a', '#e08cff']
-const tables = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos', 'kv'] as const
+const tables = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos', 'journal', 'policy', 'kv'] as const
 
 const blobToData = (b: Blob) => new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(b) })
 const dataToBlob = async (u: string) => (await fetch(u)).blob()
 
 export default function SettingsView() {
-  const { settings, setSettings, toast, family } = useApp()
+  const { settings, setSettings, toast, family, me } = useApp()
   const limited = family?.status === 'approved' && family.access === 'limited'
   const canInvite = family?.status === 'approved' && family.role !== 'member'
   const [inviting, setInviting] = useState<Member | null>(null)
   const members = useMembers()
+  const policies = useLiveQuery(() => db.policy.toArray(), [], [])
+  // only a parent's own sign-in may change a child's journal privacy
+  const meM = members.find((m) => m.id === me)
+  const canSetPrivacy = !limited && (family ? family.role !== 'member' : !members.some((m) => m.role === 'parent') || meM?.role === 'parent')
   const [perm, setPerm] = useState(notifySupported() ? Notification.permission : 'unsupported')
   const [nm, setNm] = useState('')
 
@@ -108,6 +114,22 @@ export default function SettingsView() {
             <label className="btn"><Upload size={15} />Restore backup<input type="file" accept="application/json" hidden onChange={(e) => importAll(e.target.files?.[0])} /></label>
             <button className="btn danger" onClick={async () => { if (confirm('Erase ALL BindingTies data on this device? Export a backup first.')) { await db.delete(); location.reload() } }}>Erase everything</button>
           </div>
+        </div>}
+        {canSetPrivacy && <div className="card" style={{ marginTop: 0 }}>
+          <h3>Journals &amp; privacy</h3>
+          <p className="muted">Journals are private to their author. A child under 15 can choose which entries their parents may read. Turn this on to read everything they write, whatever they choose.</p>
+          <div className="stack" style={{ marginTop: 8 }}>
+            {members.filter((m) => m.role === 'child').map((m) => isMinor(m) ? (
+              <label key={m.id} className="row" style={{ gap: 10, alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+                <input type="checkbox" checked={policies.some((p) => p.id === m.id && p.parentsRead)} onChange={(e) => db.policy.put({ id: m.id, parentsRead: e.target.checked })} />
+                <span><b>Parents can read {m.name}'s journal</b><br /><span className="muted small">{m.name} will see a notice that their parents can read their journal. If this is off, {m.name} can keep entries private.</span></span>
+              </label>
+            ) : (
+              <div key={m.id} className="muted">{m.name} is 15 or older, so their journal stays private. Parents can't override that.</div>
+            ))}
+            {!members.some((m) => m.role === 'child') && <div className="muted">No children added yet.</div>}
+          </div>
+          <p className="muted small" style={{ marginTop: 10 }}>A child needs their own sign-in for a journal that is truly private. Use Invite on their name above.</p>
         </div>}
       </div>
       {inviting && <InviteModal person={inviting} onClose={() => setInviting(null)} />}
