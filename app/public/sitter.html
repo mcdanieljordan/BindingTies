@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://rqukvcntuhiqfrefyfhk.supabase.co; base-uri 'none'; form-action 'none'">
+<title>Sitter info</title>
+<style>
+:root{--ink:#161b2c;--mut:#5b6475;--bg:#f4f5f9;--card:#fff;--line:#dde0e8;--red:#c82832;--redbg:#fdecee;--acc:#5b49e0}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:19px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:0 14px 60px}
+header{background:var(--red);color:#fff;padding:18px 14px 16px}
+header .in{max-width:720px;margin:0 auto}
+header h1{margin:0;font-size:25px;line-height:1.2}
+header p{margin:6px 0 0;font-size:16px;opacity:.95}
+.sos{background:#fff;border:3px solid var(--red);border-radius:16px;padding:14px 16px;margin:16px 0;text-align:center}
+.sos b{color:var(--red);font-size:23px;display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:14px 0}
+h2{margin:0 0 8px;font-size:22px}
+h3{margin:14px 0 4px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--red)}
+.allergy{background:var(--redbg);border:2px solid var(--red);border-radius:12px;padding:10px 12px;margin:8px 0;font-weight:700;font-size:21px}
+.allergy small{display:block;color:var(--red);font-size:12px;letter-spacing:.07em;text-transform:uppercase}
+.mut{color:var(--mut);font-size:16px}
+a.tel{color:var(--acc);font-weight:700;text-decoration:none;white-space:nowrap}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.notes{background:#fff8e1;border:2px solid #f0c040}
+.ev{padding:7px 0;border-top:1px solid var(--line)}
+.ev:first-of-type{border-top:0}
+.day{font-weight:700;margin:12px 0 2px}
+ul{margin:4px 0 0;padding-left:22px}
+button{font:inherit;font-weight:700;border:0;border-radius:12px;background:var(--acc);color:#fff;padding:12px 18px;margin:4px 6px 4px 0}
+button.sec{background:#e8e8f2;color:var(--ink)}
+#msg{padding:40px 8px;text-align:center}
+@media print{header{background:#fff;color:#000;border-bottom:3px solid #000}button,.noprint{display:none}body{font-size:14px;background:#fff}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div id="app"><div id="msg">Opening…</div></div>
+<script>
+(function(){
+  var API='https://rqukvcntuhiqfrefyfhk.supabase.co/functions/v1/sitter-view';
+  var app=document.getElementById('app');
+  function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+  function add(p){for(var i=1;i<arguments.length;i++){if(arguments[i])p.appendChild(arguments[i])}return p}
+  function tel(phone){var d=String(phone||'').replace(/[^\d+]/g,'');var a=el('a','tel',phone);if(d.length>=3)a.href='tel:'+d;return a}
+  function time(t){if(!t)return '';var p=t.split(':'),h=+p[0],m=p[1];return ((h+11)%12+1)+':'+m+' '+(h<12?'AM':'PM')}
+  function dayLabel(d,today){var a=new Date(d+'T00:00:00'),b=new Date(today+'T00:00:00');var diff=Math.round((a-b)/864e5);var s=a.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});return diff===0?'Today, '+s:diff===1?'Tomorrow, '+s:s}
+  function contactRows(list){var box=el('div');(list||[]).forEach(function(c){var r=el('div','row');var l=el('div');add(l,el('b',null,c.name||'Contact'));if(c.relation)add(l,el('span','mut','  '+c.relation));add(r,l,c.phone?tel(c.phone):null);add(box,r)});return box}
+  function section(title,node){if(!node)return null;var w=el('div');add(w,el('h3',null,title),node);return w}
+  function text(t){return t?el('div',null,t):null}
+
+  function render(d){
+    app.textContent='';
+    var head=el('header'),inn=el('div','in');
+    add(inn,el('h1',null,'Info for '+(d.label||'the sitter')),el('p',null,'Live from the family. This link works until '+new Date(d.expiresAt).toLocaleString(undefined,{weekday:'short',hour:'numeric',minute:'2-digit',month:'short',day:'numeric'})+'.'));
+    add(head,inn);app.appendChild(head);
+    var wrap=el('div','wrap');app.appendChild(wrap);
+
+    var sos=el('div','sos');add(sos,el('b',null,'In an emergency, call 911 first'));
+    var pc=el('div','mut','Poison control: ');add(pc,tel(d.household.poison||'1-800-222-1222'));add(sos,pc);add(wrap,sos);
+
+    if(d.notes){var n=el('div','card notes');add(n,el('h2',null,'Notes from the family'),el('div',null,d.notes));n.lastChild.style.whiteSpace='pre-wrap';add(wrap,n)}
+
+    (d.people||[]).forEach(function(p){
+      var c=el('div','card');
+      add(c,el('h2',null,p.name+(p.age!=null?', age '+p.age:'')));
+      var a=el('div','allergy');add(a,el('small',null,'Allergies'),document.createTextNode(p.allergies||'None recorded'));c.appendChild(a);
+      if(p.blood)add(c,section('Blood type',text(p.blood)));
+      add(c,section('Medical conditions',text(p.conditions)));
+      if(p.meds&&p.meds.length){var ml=el('ul');p.meds.forEach(function(m){add(ml,el('li',null,m.name+(m.dose?' - '+m.dose:'')+((m.times&&m.times.length)?' at '+m.times.map(time).join(', '):'')+(m.notes?' ('+m.notes+')':'')))});add(c,section('Medicine',ml))}
+      add(c,section('Other medicines',text(p.otherMeds)));
+      if(p.doctor||p.doctorPhone){var dr=el('div');add(dr,document.createTextNode((p.doctor||'')+(p.doctor&&p.doctorPhone?'  ':'')),p.doctorPhone?tel(p.doctorPhone):null);add(c,section('Doctor',dr))}
+      add(c,section('Good to know',text(p.notes)));
+      if(p.contacts&&p.contacts.length)add(c,section('Also call',contactRows(p.contacts)));
+      (p.routines||[]).forEach(function(r){if(!r.steps||!r.steps.length)return;var ol=el('ol');r.steps.forEach(function(s){add(ol,el('li',null,s))});add(c,section((r.name||'Routine')+' steps',ol))});
+      add(wrap,c);
+    });
+
+    if(d.schedule&&d.schedule.length){
+      var sc=el('div','card');add(sc,el('h2',null,'Schedule'));
+      var last='';d.schedule.forEach(function(e){
+        if(e.date!==last){last=e.date;add(sc,el('div','day',dayLabel(e.date,d.today)))}
+        var ev=el('div','ev');var line=(e.start?time(e.start)+(e.end?' - '+time(e.end):'')+'  ':'')+(e.title||'');add(ev,el('b',null,line));
+        var more=[];if(e.who&&e.who.length)more.push(e.who.join(', '));if(e.driver)more.push('driver: '+e.driver);if(e.notes)more.push(e.notes);
+        if(more.length)add(ev,el('div','mut',more.join('  -  ')));add(sc,ev)});
+      add(wrap,sc);
+    }
+
+    var h=d.household||{},hh=el('div','card');add(hh,el('h2',null,'The home'));
+    add(hh,section('Address',h.address?(function(){var x=el('div',null,h.address);x.style.whiteSpace='pre-wrap';return x})():null));
+    if(h.hospital||h.hospitalPhone){var ho=el('div');add(ho,document.createTextNode((h.hospital||'')+(h.hospital&&h.hospitalPhone?'  ':'')),h.hospitalPhone?tel(h.hospitalPhone):null);add(hh,section('Preferred hospital',ho))}
+    if(h.houseNotes){var hn=text(h.houseNotes);hn.style.whiteSpace='pre-wrap';add(hh,section('Good to know',hn))}
+    if(h.contacts&&h.contacts.length)add(hh,section('Family contacts',contactRows(h.contacts)));
+    add(wrap,hh);
+
+    var f=el('div','noprint');
+    var pr=el('button',null,'Print this page');pr.onclick=function(){window.print()};
+    var rf=el('button','sec','Refresh');rf.onclick=load;
+    add(f,pr,rf,el('p','mut','Updated '+new Date(d.generatedAt).toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'})+'. This page shows private family information. Please do not share the link or take screenshots of it.'));
+    add(wrap,f);
+    document.title='Info for '+(d.label||'the sitter');
+  }
+
+  function gone(){app.textContent='';var m=el('div');m.id='msg';add(m,el('h2',null,'This link is no longer active'),el('p','mut','It has expired or the family turned it off. Please ask them for a new link.'));app.appendChild(m)}
+  function fail(){app.textContent='';var m=el('div');m.id='msg';add(m,el('h2',null,'Could not load'),el('p','mut','Check your internet connection and try again.'));var b=el('button',null,'Try again');b.onclick=load;add(m,b);app.appendChild(m)}
+
+  function load(){
+    var token=(location.hash||'').replace(/^#/,'').trim();
+    if(!token){gone();return}
+    fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:token}),cache:'no-store',referrerPolicy:'no-referrer'})
+      .then(function(r){if(r.status===404){gone();return null}if(!r.ok)throw new Error('bad');return r.json()})
+      .then(function(d){if(d)render(d)})
+      .catch(fail);
+  }
+  window.addEventListener('hashchange',load);
+  load();
+})();
+</script>
+</body>
+</html>

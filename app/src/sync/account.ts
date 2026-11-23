@@ -91,7 +91,7 @@ export async function revokeInvite(id: string) {
   const { error } = await sb!.rpc('revoke_invite', { p_invite: id })
   if (error) throw error
 }
-export const inviteLink = (token: string) => `${location.origin}${import.meta.env.BASE_URL}?invite=${token}`
+export const inviteLink = (token: string) => `${isNative ? 'https://mcdanieljordan.github.io/BindingTies/' : location.origin + import.meta.env.BASE_URL}?invite=${token}`
 /** Looks for an invite that belongs to this login: the link they opened, or their verified email. */
 export async function resolveInvite(): Promise<{ fam: FamilyInfo | null; joinedByInvite: boolean }> {
   const tok = pendingInviteToken()

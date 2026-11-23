@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { FileDown, Plus, ShieldAlert, X } from 'lucide-react'
 import { db, newId, type EmergencyContact, type EmergencyInfo, type Member } from '../db'
 import { Modal, Who } from '../components/ui'
 import { useMeds, useMembers } from '../lib/useData'
 import { useApp } from '../ctx'
+import SitterLinks from '../components/SitterLinks'
 import { buildEmergencyPdf } from '../lib/emergencyPdf'
 import { savePdf } from '../lib/files'
 import { todayStr } from '../lib/dates'
@@ -32,6 +33,8 @@ export default function Emergency() {
         <div className="row" style={{ marginTop: 10 }}><button className="btn primary" onClick={() => setPrint(true)}><FileDown size={16} />Print or save sheets</button></div>
       </div>
 
+      <SitterLinks people={members} />
+
       <div className="row" style={{ gap: 6 }}>
         <button className={`tab ${sel === 0 ? 'on' : ''}`} onClick={() => setSel(0)}>🏠 Our home{house?.address || house?.contacts?.length ? '' : ' •'}</button>
         {members.map((m) => (
@@ -50,7 +53,10 @@ export default function Emergency() {
 function Form({ id, person, saved, onSaved }: { id: number; person?: Member; saved?: EmergencyInfo; onSaved: () => void }) {
   const meds = useMeds().filter((m) => m.memberId === id && m.active)
   const [d, setD] = useState<EmergencyInfo>(saved ?? blank(id))
-  const set = (p: Partial<EmergencyInfo>) => setD((x) => ({ ...x, ...p }))
+  const [dirty, setDirty] = useState(false)
+  // the saved copy can arrive after this screen opens (just synced): show it, unless the person has already started typing
+  useEffect(() => { if (!dirty && saved) setD(saved) }, [saved?.updatedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (p: Partial<EmergencyInfo>) => { setDirty(true); setD((x) => ({ ...x, ...p })) }
   const contacts = d.contacts ?? []
   const setContact = (cid: string, p: Partial<EmergencyContact>) => set({ contacts: contacts.map((c) => (c.id === cid ? { ...c, ...p } : c)) })
   const save = async () => { await db.emergency.put({ ...d, id, updatedAt: Date.now() }); onSaved() }
