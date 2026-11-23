@@ -24,7 +24,7 @@ export default function Onboarding() {
   return (
     <div className="main" style={{ maxWidth: 640, paddingTop: 40 }}>
       <div className="card">
-        <div className="brand"><span className="brand-icon"><Sparkles size={19} /></span>Welcome to FamilyOS</div>
+        <div className="brand"><span className="brand-icon"><Sparkles size={19} /></span>Welcome to BindingTies</div>
         <p className="muted">Who is in your family? Add each person, grown-ups and kids. They don't need their own login.</p>
         <div className="stack" style={{ marginTop: 14 }}>
           {list.map((m, i) => (

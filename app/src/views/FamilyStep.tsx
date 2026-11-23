@@ -29,7 +29,7 @@ export default function FamilyStep({ email, onDone }: { email?: string; onDone: 
       <div className="gate-card">
         <div className="gate-logo"><Users size={38} strokeWidth={2.4} /></div>
         <h1>Your family</h1>
-        <p>Is someone in your home already using FamilyOS?</p>
+        <p>Is someone in your home already using BindingTies?</p>
 
         <div className="card" style={{ boxShadow: 'none', background: 'var(--panel2)' }}>
           <h2 style={{ fontSize: 22 }}>Yes, I have a code</h2>

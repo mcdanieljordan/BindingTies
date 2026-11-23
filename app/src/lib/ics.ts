@@ -1,5 +1,5 @@
 // Reads iCalendar (.ics) text from Google, Apple, Outlook, schools, sports leagues, email invites.
-// Output is already shaped like FamilyOS events, converted to this device's local time.
+// Output is already shaped like BindingTies events, converted to this device's local time.
 import type { Repeat } from '../db'
 import { pad, parseYmd, todayStr, ymd } from './dates'
 
@@ -186,7 +186,7 @@ export function parseIcs(text: string, today = todayStr()): IcsResult {
     const sd = parseYmd(s.date)
     const open = !r.count && !r.until && r.interval === 1 && ex.size === 0
 
-    // simple, never-ending patterns map straight onto FamilyOS repeats
+    // simple, never-ending patterns map straight onto BindingTies repeats
     if (open && r.freq === 'DAILY' && !r.byday.length) { out.push({ ...base, key: uid, date: s.date, repeat: 'daily' }); continue }
     if (open && r.freq === 'WEEKLY' && !r.byday.some((x) => x.ord)) {
       const days = r.byday.length ? r.byday.map((x) => x.wd) : [sd.getDay()]

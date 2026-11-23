@@ -63,7 +63,7 @@ export async function setMemberAccess(fid: string, uid: string, access: Access, 
 
 /* ---------- invites ---------- */
 const INVITE_KEY = 'fos-invite'
-/** An invite link looks like https://…/FamilyOS/?invite=TOKEN. Keep the token until the person has signed in. */
+/** An invite link looks like https://…/BindingTies/?invite=TOKEN. Keep the token until the person has signed in. */
 export function captureInvite() {
   try {
     const u = new URL(location.href)
@@ -122,7 +122,7 @@ const b64 = (s: string) => {
 const FCM_KEY = 'fos-fcm'
 async function fcmToken(): Promise<string> {
   const perm = await PushNotifications.requestPermissions()
-  if (perm.receive !== 'granted') throw new Error('Notifications were not allowed. You can allow them in Android Settings → Apps → FamilyOS.')
+  if (perm.receive !== 'granted') throw new Error('Notifications were not allowed. You can allow them in Android Settings → Apps → BindingTies.')
   await PushNotifications.removeAllListeners()
   await PushNotifications.createChannel({ id: 'alerts', name: 'Family alerts', description: 'Events, alarms, timers and medicine', importance: 5, visibility: 1, vibration: true })
   return new Promise<string>((resolve, reject) => {
@@ -151,7 +151,7 @@ export async function enablePush(familyId: string) {
     try { localStorage.setItem('fos-push', '1'); localStorage.setItem(FCM_KEY, token) } catch { /* ignore */ }
     return
   }
-  if (!pushSupported()) throw new Error('This browser does not support push. On iPhone, add FamilyOS to the Home Screen first.')
+  if (!pushSupported()) throw new Error('This browser does not support push. On iPhone, add BindingTies to the Home Screen first.')
   const perm = await Notification.requestPermission()
   if (perm !== 'granted') throw new Error('Notifications were not allowed.')
   const reg = await navigator.serviceWorker.ready
@@ -193,7 +193,7 @@ export async function resetPassword(email: string) {
 
 /** Reads the sign-in result from the link the browser sent back (works for both token and code styles). */
 export async function finishNativeAuth(url: string) {
-  const u = new URL(url.replace('com.familyos.app://', 'https://x/'))
+  const u = new URL(url.replace('com.bindingties.app://', 'https://x/'))
   const q = new URLSearchParams(u.search), h = new URLSearchParams(u.hash.replace(/^#/, ''))
   const get = (k: string) => q.get(k) ?? h.get(k)
   const err = get('error_description') ?? get('error')

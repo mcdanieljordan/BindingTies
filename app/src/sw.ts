@@ -11,7 +11,7 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()))
 interface PushData { title: string; body?: string; tag?: string; url?: string; urgent?: boolean }
 
 self.addEventListener('push', (event) => {
-  let d: PushData = { title: 'FamilyOS' }
+  let d: PushData = { title: 'BindingTies' }
   try { d = { ...d, ...(event.data?.json() as PushData) } } catch { d.body = event.data?.text() }
   event.waitUntil(
     self.registration.showNotification(d.title, {

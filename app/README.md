@@ -1,4 +1,4 @@
-# FamilyOS app
+# BindingTies app
 
 Local-first family PWA: calendar, picture routines with print studio, team quests, medicine log, timers/alarms, shared lists, wall display, and a Learning Vault.
 

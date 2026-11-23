@@ -31,13 +31,13 @@ export default function SettingsView() {
       out[t] = await Promise.all(rows.map(async (r) => { const c = { ...r }; if (c.blob instanceof Blob) c.blob = await blobToData(c.blob); return c }))
     }
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: 'familyos', v: 1, data: out })], { type: 'application/json' }))
-    a.download = `familyos-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click()
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: 'bindingties', v: 1, data: out })], { type: 'application/json' }))
+    a.download = `bindingties-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click()
   }
   async function importAll(f?: File) {
     if (!f || !confirm('Replace everything on this device with the backup?')) return
     const j = JSON.parse(await f.text())
-    if (j.app !== 'familyos') return toast({ title: 'Not a FamilyOS backup', kind: 'warn' })
+    if (j.app !== 'bindingties' && j.app !== 'familyos') return toast({ title: 'Not a BindingTies backup', kind: 'warn' })
     for (const t of tables) {
       const tbl = (db as never as Record<string, { clear(): Promise<void>; bulkPut(r: unknown[]): Promise<unknown> }>)[t]
       await tbl.clear()
@@ -50,7 +50,7 @@ export default function SettingsView() {
     if (!notifySupported()) return
     const p = await Notification.requestPermission()
     setPerm(p)
-    if (p === 'granted') new Notification('FamilyOS reminders are on', { icon: import.meta.env.BASE_URL + 'favicon.svg' })
+    if (p === 'granted') new Notification('BindingTies reminders are on', { icon: import.meta.env.BASE_URL + 'favicon.svg' })
   }
   const edit = (m: Member, p: Partial<Member>) => db.members.update(m.id, p)
 
@@ -78,7 +78,7 @@ export default function SettingsView() {
           </div>
           <div className="card" style={{ background: 'var(--panel2)', boxShadow: 'none' }}>
             <b>Honest note on reminders</b>
-            <div className="muted small" style={{ marginTop: 4 }}>Without family sync, reminders fire only while FamilyOS is open. With sync and push turned on, a server sends them even when the app is closed, but phones can still delay or drop web push (Do Not Disturb, battery saver, iOS limits). For critical medicine, keep a phone alarm as backup.</div>
+            <div className="muted small" style={{ marginTop: 4 }}>Without family sync, reminders fire only while BindingTies is open. With sync and push turned on, a server sends them even when the app is closed, but phones can still delay or drop web push (Do Not Disturb, battery saver, iOS limits). For critical medicine, keep a phone alarm as backup.</div>
           </div>
         </div>
 
@@ -104,7 +104,7 @@ export default function SettingsView() {
           <div className="row">
             <button className="btn" onClick={exportAll}><Download size={15} />Export backup</button>
             <label className="btn"><Upload size={15} />Restore backup<input type="file" accept="application/json" hidden onChange={(e) => importAll(e.target.files?.[0])} /></label>
-            <button className="btn danger" onClick={async () => { if (confirm('Erase ALL FamilyOS data on this device? Export a backup first.')) { await db.delete(); location.reload() } }}>Erase everything</button>
+            <button className="btn danger" onClick={async () => { if (confirm('Erase ALL BindingTies data on this device? Export a backup first.')) { await db.delete(); location.reload() } }}>Erase everything</button>
           </div>
         </div>}
       </div>

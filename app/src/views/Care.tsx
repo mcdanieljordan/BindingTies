@@ -77,7 +77,7 @@ function Meds() {
             )
           })}
         </div>
-        <div className="muted small" style={{ marginTop: 12 }}>FamilyOS is a reminder and log only. It does not calculate doses or give medical advice.</div>
+        <div className="muted small" style={{ marginTop: 12 }}>BindingTies is a reminder and log only. It does not calculate doses or give medical advice.</div>
       </div>
 
       <div className="card" style={{ marginTop: 0 }}>
@@ -170,7 +170,7 @@ function Alarms() {
           </div>
           <div className="row">{DOW.map((d, i) => <button key={d} className={`tab ${a.days.includes(i) ? 'on' : ''}`} onClick={() => setA({ ...a, days: a.days.includes(i) ? a.days.filter((x) => x !== i) : [...a.days, i] })}>{d}</button>)}</div>
           <button className="btn primary" onClick={async () => { await db.alarms.add({ label: a.label || 'Alarm', time: a.time, days: a.days, enabled: true } as never); setA({ ...a, label: '' }) }}><Plus size={16} />Add alarm</button>
-          <div className="muted small"><BellRing size={12} style={{ verticalAlign: -1 }} /> Alarms ring while FamilyOS is open on a device. For wake-up alarms you can't miss, keep a phone alarm as backup until the native app arrives.</div>
+          <div className="muted small"><BellRing size={12} style={{ verticalAlign: -1 }} /> Alarms ring while BindingTies is open on a device. For wake-up alarms you can't miss, keep a phone alarm as backup until the native app arrives.</div>
         </div>
       </div>
       <div className="card" style={{ marginTop: 0 }}>

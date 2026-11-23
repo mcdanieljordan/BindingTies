@@ -15,7 +15,7 @@ export default function Landing({ onStart, onSignIn, onLocal }: { onStart: () =>
   return (
     <div className="land">
       <header className="land-nav">
-        <div className="brand"><span className="brand-icon"><Home size={19} strokeWidth={2.6} /></span>FamilyOS</div>
+        <div className="brand"><span className="brand-icon"><Home size={19} strokeWidth={2.6} /></span>BindingTies</div>
         <button className="btn" onClick={onSignIn}>Sign in</button>
       </header>
       <InviteBanner />
@@ -87,7 +87,7 @@ export default function Landing({ onStart, onSignIn, onLocal }: { onStart: () =>
         <button className="btn primary huge" style={{ maxWidth: 380 }} onClick={onStart}>Create my free account</button>
         <button className="link" onClick={onLocal}>Or try it on this device with no account</button>
       </section>
-      <footer className="land-foot muted">FamilyOS • Made for families • <a href={`${import.meta.env.BASE_URL}privacy.html`}>Privacy & Terms</a></footer>
+      <footer className="land-foot muted">BindingTies • Made for families • <a href={`${import.meta.env.BASE_URL}privacy.html`}>Privacy & Terms</a></footer>
     </div>
   )
 }

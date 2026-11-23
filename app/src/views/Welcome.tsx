@@ -37,7 +37,7 @@ export default function Welcome({ onLocal, onBack, start = 'in' }: { onLocal: ()
     <div className="gate">
       <form className="gate-card" onSubmit={(e) => { e.preventDefault(); void go() }}>
         <div className="gate-logo"><Home size={38} strokeWidth={2.6} /></div>
-        <h1>Welcome to FamilyOS</h1>
+        <h1>Welcome to BindingTies</h1>
         <InviteBanner />
         <p>Your family's calendar, chores and reminders, together.</p>
 

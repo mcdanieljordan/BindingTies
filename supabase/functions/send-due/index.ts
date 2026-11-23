@@ -51,7 +51,7 @@ function buildMessages(fid: string, recs: Rec[], tz: string): Msg[] {
     for (const time of m.times ?? []) {
       if (doses.some((d) => String(d.medId) === rid && d.date === today && d.time === time)) continue
       const late = mins - hm(time)
-      if (late >= 0 && late <= 30) out.push({ key: `med:${fid}:${rid}:${today}:${time}:${Math.floor(late / 10)}`, title: `💊 ${m.name} for ${who}`, body: `${m.dose ?? ''} due at ${fmt12(time)}. Mark it given in FamilyOS.`, urgent: true, fullOnly: true })
+      if (late >= 0 && late <= 30) out.push({ key: `med:${fid}:${rid}:${today}:${time}:${Math.floor(late / 10)}`, title: `💊 ${m.name} for ${who}`, body: `${m.dose ?? ''} due at ${fmt12(time)}. Mark it given in BindingTies.`, urgent: true, fullOnly: true })
       else if (late > 30 && late <= 120) out.push({ key: `medesc:${fid}:${rid}:${today}:${time}`, title: `Not logged yet: ${m.name} for ${who}`, body: `Due at ${fmt12(time)}. Has someone already given it? Check before giving another dose.`, urgent: true, fullOnly: true })
     }
   }

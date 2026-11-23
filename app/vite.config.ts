@@ -2,8 +2,8 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Served from https://<user>.github.io/FamilyOS/ in production builds on GitHub
-const base = process.env.GITHUB_ACTIONS ? '/FamilyOS/' : '/'
+// Served from https://<user>.github.io/BindingTies/ in production builds on GitHub
+const base = process.env.GITHUB_ACTIONS ? '/BindingTies/' : '/'
 
 export default defineConfig({
   base,
@@ -18,8 +18,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'FamilyOS',
-        short_name: 'FamilyOS',
+        name: 'BindingTies',
+        short_name: 'BindingTies',
         description: "Your family's mission control",
         theme_color: '#11172b',
         background_color: '#0b1020',

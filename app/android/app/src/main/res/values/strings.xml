@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">FamilyOS</string>
-    <string name="title_activity_main">FamilyOS</string>
-    <string name="package_name">com.familyos.app</string>
-    <string name="custom_url_scheme">com.familyos.app</string>
+    <string name="app_name">BindingTies</string>
+    <string name="title_activity_main">BindingTies</string>
+    <string name="package_name">com.bindingties.app</string>
+    <string name="custom_url_scheme">com.bindingties.app</string>
 </resources>

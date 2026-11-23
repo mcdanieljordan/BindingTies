@@ -135,7 +135,7 @@ export default function CalendarView() {
               <label className="f">Remind me<select value={edit.remindMin} onChange={(e) => setEdit({ ...edit, remindMin: Number(e.target.value) })}><option value={0}>No reminder</option><option value={5}>5 min before</option><option value={15}>15 min before</option><option value={30}>30 min before</option><option value={60}>1 hour before</option><option value={120}>2 hours before</option></select></label>
             </div>
             <label className="f">Notes<textarea rows={2} value={edit.notes ?? ''} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></label>
-            <div className="row between"><span className="muted small">Reminders fire while FamilyOS is open. See Settings for notifications.</span><button className="btn primary" onClick={save}>Save</button></div>
+            <div className="row between"><span className="muted small">Reminders fire while BindingTies is open. See Settings for notifications.</span><button className="btn primary" onClick={save}>Save</button></div>
           </div>
         </Modal>
       )}

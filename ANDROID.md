@@ -1,6 +1,6 @@
-# FamilyOS on Android
+# BindingTies on Android
 
-The app is the same React build wrapped by Capacitor (`app/android`, app id `com.familyos.app`).
+The app is the same React build wrapped by Capacitor (`app/android`, app id `com.bindingties.app`).
 
 ## Build and run
 ```bash
@@ -24,10 +24,10 @@ Not yet verified end to end with a real email attachment.
    closed test with 12 testers for 14 days (personal accounts).
 
 ## Native Google sign-in and push (setup)
-- Google sign-in opens the phone's browser and returns via `com.familyos.app://auth`.
+- Google sign-in opens the phone's browser and returns via `com.bindingties.app://auth`.
   Add that URL to Supabase → Authentication → URL Configuration → Redirect URLs.
 - Push uses Firebase Cloud Messaging:
-  1. Firebase console → add project → add Android app `com.familyos.app` → download `google-services.json` into `app/android/app/`.
+  1. Firebase console → add project → add Android app `com.bindingties.app` → download `google-services.json` into `app/android/app/`.
   2. Firebase → Project settings → Service accounts → generate a private key (JSON) and save it as the Supabase
      Edge Function secret `FCM_SERVICE_ACCOUNT` (paste the whole JSON).
   3. Redeploy `send-due` (it sends to FCM tokens stored as `fcm:<token>` in `push_subscriptions`).

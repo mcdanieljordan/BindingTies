@@ -61,7 +61,7 @@ export default function SyncPanel() {
         <button className={`btn ${push ? '' : 'primary'}`} disabled={busy || !pushSupported()} onClick={async () => { setBusy(true); try { if (push) await disablePush(); else await enablePush(fam.id); setPush(await pushActive()) } catch (e) { toast({ title: 'Could not change alerts', body: (e as Error).message, kind: 'warn' }) } finally { setBusy(false) } }}><Bell size={14} />{push ? 'Turn off alerts on this device' : 'Turn on alerts on this device'}</button>
         <button className="btn ghost" onClick={() => { if (confirm('Sign out on this device? Your family\'s information stays safe in the cloud and comes back when you sign in.')) void leaveFamily() }}><LogOut size={14} />Sign out</button>
       </div>
-      {!pushSupported() && <div className="muted small">Alerts need the installed app. On iPhone: tap Share, then Add to Home Screen, then open FamilyOS from your Home Screen.</div>}
+      {!pushSupported() && <div className="muted small">Alerts need the installed app. On iPhone: tap Share, then Add to Home Screen, then open BindingTies from your Home Screen.</div>}
     </div>
   )
 }

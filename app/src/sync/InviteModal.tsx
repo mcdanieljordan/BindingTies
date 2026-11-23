@@ -22,14 +22,14 @@ export default function InviteModal({ person, onClose }: { person: Member; onClo
 
   const role = person.role === 'parent' ? 'parent' : 'member'
   const link = inv ? inviteLink(inv.token) : ''
-  const msg = `${person.name}, you're invited to join ${family.name} on FamilyOS. Tap this link and sign in with Google or an email and password: ${link}`
+  const msg = `${person.name}, you're invited to join ${family.name} on BindingTies. Tap this link and sign in with Google or an email and password: ${link}`
 
   async function make() {
     setBusy(true); setErr('')
     try { setInv(await createInvite(family!.id, person.id, email, role === 'parent' ? 'full' : access, role) as Invite) } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
   }
   const share = async () => {
-    try { if (navigator.share) await navigator.share({ title: 'FamilyOS invite', text: msg }); else { await navigator.clipboard.writeText(msg); toast({ title: 'Message copied' }) } } catch { /* cancelled */ }
+    try { if (navigator.share) await navigator.share({ title: 'BindingTies invite', text: msg }); else { await navigator.clipboard.writeText(msg); toast({ title: 'Message copied' }) } } catch { /* cancelled */ }
   }
 
   return (
@@ -65,7 +65,7 @@ export default function InviteModal({ person, onClose }: { person: Member; onClo
             <input readOnly value={link} onFocus={(e) => e.currentTarget.select()} aria-label="Invite link" />
             <div className="row" style={{ flexWrap: 'wrap' }}>
               <a className="btn mint" href={`sms:?&body=${encodeURIComponent(msg)}`}><MessageSquare size={16} />Text</a>
-              <a className="btn" href={`mailto:${encodeURIComponent(inv.email ?? '')}?subject=${encodeURIComponent(`Join ${family.name} on FamilyOS`)}&body=${encodeURIComponent(msg)}`}><Mail size={16} />Email</a>
+              <a className="btn" href={`mailto:${encodeURIComponent(inv.email ?? '')}?subject=${encodeURIComponent(`Join ${family.name} on BindingTies`)}&body=${encodeURIComponent(msg)}`}><Mail size={16} />Email</a>
               <button className="btn" onClick={share}><Share2 size={16} />Share…</button>
               <button className="btn" onClick={() => { void navigator.clipboard.writeText(link); toast({ title: 'Link copied' }) }}><Copy size={16} />Copy</button>
             </div>

@@ -82,7 +82,7 @@ export default function ImportCalendar({ onClose, onDone, initialText, initialNa
               </>
             ) : (
               <>
-                <p className="muted" style={{ margin: 0 }}>Paste a calendar link (it may start with <b>webcal://</b>). FamilyOS keeps it up to date, so changes at the school or team show up here.</p>
+                <p className="muted" style={{ margin: 0 }}>Paste a calendar link (it may start with <b>webcal://</b>). BindingTies keeps it up to date, so changes at the school or team show up here.</p>
                 <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://… or webcal://…" aria-label="Calendar link" />
                 <button className="btn primary" disabled={busy || link.trim().length < 8} onClick={onLink}>{busy ? 'Reading…' : 'Look at it'}</button>
               </>

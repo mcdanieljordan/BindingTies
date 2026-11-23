@@ -1,4 +1,4 @@
-package com.familyos.app;
+package com.bindingties.app;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -6,7 +6,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
-/** Hands a calendar file that Android opened with FamilyOS (from email, Files, Drive…) to the web app. */
+/** Hands a calendar file that Android opened with BindingTies (from email, Files, Drive…) to the web app. */
 @CapacitorPlugin(name = "IcsIntent")
 public class IcsIntentPlugin extends Plugin {
     static String pending;

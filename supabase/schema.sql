@@ -1,4 +1,4 @@
--- FamilyOS sync + push schema. Apply once to a NEW Supabase project.
+-- BindingTies sync + push schema. Apply once to a NEW Supabase project.
 create extension if not exists pgcrypto;
 
 create table public.families (

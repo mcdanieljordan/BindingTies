@@ -137,7 +137,7 @@ export default function App() {
 
   // ---- front door ----
   if (syncConfigured && !localOnly) {
-    if (session.loading) return <Splash text="Opening FamilyOS…" />
+    if (session.loading) return <Splash text="Opening BindingTies…" />
     const goLocal = () => { setLocalOnly(true); void setKV('localOnly', true) }
     if (!session.uid) return wrap(auth ? <Welcome start={auth} onLocal={goLocal} onBack={() => setAuth(null)} /> : <Landing onStart={() => setAuth('new')} onSignIn={() => setAuth('in')} onLocal={goLocal} />)
     if (fam === undefined) return <Splash text="Opening your family…" />
@@ -163,7 +163,7 @@ export default function App() {
     <AppCtx.Provider value={ctx}>
       <div className="shell">
         <aside className="sidebar no-print">
-          <div className="brand"><span className="brand-icon"><Home size={19} strokeWidth={2.6} /></span>FamilyOS</div>
+          <div className="brand"><span className="brand-icon"><Home size={19} strokeWidth={2.6} /></span>BindingTies</div>
           {nav.map(({ id, label, I }) => (
             <button key={id} className={`nav-btn ${view === id ? 'active' : ''}`} onClick={() => setView(id)}><I size={19} />{label}</button>
           ))}

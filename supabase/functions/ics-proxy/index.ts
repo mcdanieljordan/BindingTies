@@ -1,4 +1,4 @@
-// Fetches a public calendar link (.ics) for a signed-in FamilyOS user, because browsers can't read other sites' calendars directly.
+// Fetches a public calendar link (.ics) for a signed-in BindingTies user, because browsers can't read other sites' calendars directly.
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 const json = (b: unknown) => new Response(JSON.stringify(b), { headers: { ...cors, 'Content-Type': 'application/json' } })
 const NOPE = 'That address is not allowed.'
@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     let u = new URL(String(url).replace(/^webcal(s?):\/\//i, 'https://'))
     for (let hop = 0; hop < 4; hop++) {
       await safe(u)
-      const r = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(10_000), headers: { Accept: 'text/calendar, text/plain, */*', 'User-Agent': 'FamilyOS-calendar-reader' } })
+      const r = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(10_000), headers: { Accept: 'text/calendar, text/plain, */*', 'User-Agent': 'BindingTies-calendar-reader' } })
       if (r.status >= 300 && r.status < 400 && r.headers.get('location')) { u = new URL(r.headers.get('location')!, u); continue }
       if (!r.ok) return json({ error: `The calendar site answered with an error (${r.status}).` })
       const text = await r.text()

@@ -274,7 +274,7 @@ function PrintStudio({ r, childName }: { r: Routine; childName?: string }) {
               </div>
             ))}
           </div>
-          <div className="pr-foot">FamilyOS • {r.steps.length} steps • I did it! ⭐</div>
+          <div className="pr-foot">BindingTies • {r.steps.length} steps • I did it! ⭐</div>
         </div>
       </div>
     </>

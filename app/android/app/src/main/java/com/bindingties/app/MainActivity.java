@@ -1,4 +1,4 @@
-package com.familyos.app;
+package com.bindingties.app;
 
 import android.content.Intent;
 import android.net.Uri;

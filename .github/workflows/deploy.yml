@@ -1,4 +1,4 @@
-name: Deploy FamilyOS to GitHub Pages
+name: Deploy BindingTies to GitHub Pages
 on:
   push:
     branches: [main]

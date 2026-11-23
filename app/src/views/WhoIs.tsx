@@ -5,7 +5,7 @@ export default function WhoIs({ members, onPick, onClose }: { members: Member[];
   return (
     <div className="gate">
       <div className="gate-card" style={{ width: 'min(680px, 100%)' }}>
-        <h1>Who is using FamilyOS?</h1>
+        <h1>Who is using BindingTies?</h1>
         <p>Tap your name.</p>
         <div className="who-grid">
           {members.map((m) => (
