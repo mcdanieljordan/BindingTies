@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Lock, Plus, Search, Settings2, Target, Trash2, X } from 'lucide-react'
-import { db, newId, type JournalEntry, type JournalGoal, type Member } from '../db'
+import { db, newId, type JournalEntry, type JournalGoal, type JournalMedia, type Member } from '../db'
+import { AttachBar, MediaList } from '../components/JournalMedia'
+import { fmtSize, removeMedia } from '../lib/media'
 import { Empty, Modal, PageHead, Who } from '../components/ui'
 import { useMembers } from '../lib/useData'
 import { useApp } from '../ctx'
 import { addDays, fmtDate, todayStr } from '../lib/dates'
 import { audience, canEdit, canSee, getPin, hashPin, isMinor, isUnlocked, savePin, setUnlocked } from '../lib/journal'
 
-type Draft = Partial<JournalEntry> & { goals: JournalGoal[]; shareWith: number[]; shareParents: boolean }
+type Draft = Partial<JournalEntry> & { goals: JournalGoal[]; shareWith: number[]; shareParents: boolean; media: JournalMedia[] }
 
 const longDate = (s: string) => fmtDate(s, { weekday: 'short', month: 'short', day: 'numeric', year: s.slice(0, 4) === todayStr().slice(0, 4) ? undefined : 'numeric' })
 const firstLine = (t: string) => (t.split('\n').find((l) => l.trim()) ?? '').slice(0, 90)
@@ -18,6 +20,7 @@ export default function Journal() {
   const members = useMembers()
   const entries = useLiveQuery(() => db.journal.toArray(), [], [])
   const policies = useLiveQuery(() => db.policy.toArray(), [], [])
+  const allMedia = useLiveQuery(() => db.journalMedia.toArray(), [], [])
   const meM = members.find((m) => m.id === me)
   const [tab, setTab] = useState<'mine' | 'others'>('mine')
   const [q, setQ] = useState('')
@@ -70,21 +73,28 @@ export default function Journal() {
   const past = pool.filter((e) => e.date <= today).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt)
   const nOthers = visible.filter((e) => e.ownerMemberId !== meM.id).length
 
-  const blank = (date: string, kind: 'note' | 'plan'): Draft => ({ date, kind, title: '', body: '', goals: [], shareWith: [], shareParents: isMinor(meM) })
-  function toDraft(e: JournalEntry): Draft { return { ...e, goals: e.goals ?? [], shareWith: e.shareWith ?? [] } }
+  const blank = (date: string, kind: 'note' | 'plan'): Draft => ({ date, kind, title: '', body: '', goals: [], shareWith: [], shareParents: isMinor(meM), media: [] })
+  function toDraft(e: JournalEntry): Draft { return { ...e, goals: e.goals ?? [], shareWith: e.shareWith ?? [], media: allMedia.filter((m) => m.entryId === e.id) } }
 
   async function save() {
     if (!edit || !meM) return
     const goals = edit.goals.filter((g) => g.text.trim()).map((g) => ({ ...g, text: g.text.trim() }))
     const body = (edit.body ?? '').trim()
-    if (!body && !goals.length) return toast({ title: 'Write something first', kind: 'warn' })
+    if (!body && !goals.length && !edit.media.length) return toast({ title: 'Write something or add a photo first', kind: 'warn' })
     const rec = { ownerMemberId: meM.id, date: edit.date ?? today, kind: edit.kind ?? 'note', title: edit.title?.trim() || undefined, body, goals, shareWith: edit.shareWith, shareParents: forced ? true : edit.shareParents, updatedAt: Date.now() }
-    if (edit.id) await db.journal.update(edit.id, rec)
-    else await db.journal.add({ ...rec, createdAt: Date.now() } as never)
+    const id = edit.id ?? newId()
+    if (edit.id) await db.journal.update(id, rec)
+    else await db.journal.add({ ...rec, id, createdAt: Date.now() } as never)
+    // attachments: add the new ones, remove the ones taken off
+    const before = allMedia.filter((m) => m.entryId === id)
+    const had = new Set(before.map((m) => m.id)), keep = new Set(edit.media.map((m) => m.id))
+    for (const m of edit.media) if (!had.has(m.id)) await db.journalMedia.add({ ...m, entryId: id } as never)
+    for (const m of before) if (!keep.has(m.id)) await removeMedia(m)
     setEdit(null)
   }
   async function remove(e: Draft) {
     if (!e.id || !confirm('Delete this entry? This cannot be undone.')) return
+    for (const m of allMedia.filter((x) => x.entryId === e.id)) await removeMedia(m)
     await db.journal.delete(e.id); setEdit(null)
   }
   const others = members.filter((m) => m.id !== meM.id && m.role !== 'caregiver' && !(isMinor(meM) && m.role === 'parent'))
@@ -94,6 +104,8 @@ export default function Journal() {
     const mine = e.ownerMemberId === meM.id
     const a = audience(e, members)
     const done = e.goals.filter((g) => g.done).length
+    const att = allMedia.filter((m) => m.entryId === e.id)
+    const n = (k: JournalMedia['kind']) => att.filter((m) => m.kind === k).length
     return (
       <div className="item jcard" onClick={() => (canEdit(e, meM) ? setEdit(toDraft(e)) : setRead(e))} style={{ cursor: 'pointer', alignItems: 'flex-start' }}>
         {!mine && <Who m={mem(e.ownerMemberId)} size={34} />}
@@ -103,6 +115,9 @@ export default function Journal() {
           {e.title && e.body && <div className="muted jclamp">{e.body}</div>}
           <div className="row" style={{ marginTop: 4, gap: 6 }}>
             {e.goals.length > 0 && <span className="chip"><Target size={12} /> {done}/{e.goals.length} goals</span>}
+            {n('image') > 0 && <span className="chip">🖼 {n('image')}</span>}
+            {n('audio') > 0 && <span className="chip">🎧 {n('audio')}</span>}
+            {n('video') > 0 && <span className="chip">🎬 {n('video')}</span>}
             {mine ? <span className="chip">{a.icon} {a.text}</span> : <span className="chip">From {mem(e.ownerMemberId)?.name ?? 'someone'}</span>}
           </div>
         </div>
@@ -179,6 +194,16 @@ export default function Journal() {
             </div>
 
             <div>
+              <div className="muted" style={{ fontWeight: 800, marginBottom: 6 }}>Photos &amp; recordings</div>
+              <div className="stack" style={{ gap: 8 }}>
+                <MediaList items={edit.media} onRemove={(m) => setEdit((d) => d && { ...d, media: d.media.filter((x) => x.id !== m.id) })} />
+                {edit.media.length < 12
+                  ? <AttachBar owner={meM.id} warn={(t) => toast({ title: t, kind: 'warn' })} onAdd={(m) => setEdit((d) => d && (d.media.length >= 12 ? d : { ...d, media: [...d.media, m] }))} />
+                  : <div className="muted small">That is the most attachments one entry can hold (12).</div>}
+              </div>
+            </div>
+
+            <div>
               <div className="muted" style={{ fontWeight: 800, marginBottom: 6 }}>Who can read this</div>
               {isMinor(meM) && (
                 <label className="row" style={{ gap: 8, alignItems: 'flex-start', flexWrap: 'nowrap', marginBottom: 8 }}>
@@ -211,6 +236,7 @@ export default function Journal() {
             {read.title && <h3>{read.title}</h3>}
             <div style={{ whiteSpace: 'pre-wrap' }}>{read.body}</div>
             {read.goals.length > 0 && <div className="stack" style={{ gap: 4 }}>{read.goals.map((g) => <div key={g.id}>{g.done ? '☑' : '☐'} {g.text}</div>)}</div>}
+            <MediaList items={allMedia.filter((m) => m.entryId === read.id)} />
             <div className="muted small">Shared with you to read. Only {mem(read.ownerMemberId)?.name ?? 'the author'} can change it.</div>
           </div>
         </Modal>
@@ -220,6 +246,7 @@ export default function Journal() {
         <Modal title="Journal lock" onClose={() => { setLockOpen(false); setPin('') }}>
           <div className="stack">
             <p className="muted" style={{ margin: 0 }}>{hasPin ? 'A PIN is set. It is asked for before this journal opens on this device.' : 'Optional: ask for a PIN before this journal opens on this device. Handy on a family tablet or a parent’s phone.'} It keeps casual snoopers out, but it is not encryption.</p>
+            <div className="muted small">Your photos and recordings use {fmtSize(allMedia.filter((m) => m.ownerMemberId === meM.id).reduce((t, m) => t + m.size, 0))} of your family's free storage (about 1 GB in total).</div>
             <label className="f">{hasPin ? 'New PIN (4 to 8 digits)' : 'PIN (4 to 8 digits)'}<input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))} /></label>
             <div className="row between">
               {hasPin ? <button className="btn ghost" onClick={() => { savePin(meM.id, null); setHasPin(false); setUnlocked(null); setLockOpen(false); setPin('') }}>Remove PIN</button> : <span />}

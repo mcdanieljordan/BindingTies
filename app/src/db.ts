@@ -101,6 +101,21 @@ export interface JournalEntry {
   createdAt: number
   updatedAt: number
 }
+/** a photo, voice note, audio or video clip attached to a journal entry. The file itself lives in private storage. */
+export interface JournalMedia {
+  id: number
+  entryId: number
+  ownerMemberId: number
+  kind: 'image' | 'audio' | 'video' | 'file'
+  name: string
+  mime: string
+  size: number
+  durationSec?: number
+  createdAt: number
+  /** present on the device that added it; other devices download on demand */
+  blob?: Blob
+  blobPath?: string
+}
 /** one row per child; a parent can switch on reading for a child under 15 */
 export interface JournalPolicy { id: number; parentsRead: boolean }
 export interface ChoreTemplate { id: string; title: string; points: number; repeat: Repeat }
@@ -205,6 +220,7 @@ export const db = new Dexie('familyos-v2') as Dexie & {
   photos: EntityTable<PhotoBlob, 'id'>
   journal: EntityTable<JournalEntry, 'id'>
   policy: EntityTable<JournalPolicy, 'id'>
+  journalMedia: EntityTable<JournalMedia, 'id'>
   kv: EntityTable<KV, 'key'>
 }
 
@@ -230,10 +246,11 @@ db.version(1).stores({
 })
 
 db.version(2).stores({ journal: 'id, date, ownerMemberId', policy: 'id' })
+db.version(3).stores({ journalMedia: 'id, entryId' })
 
 /* Random ids that stay unique across devices (fits safely in a JS number). */
 export const newId = () => Math.floor(Math.random() * 2 ** 48) + 1
-export const SYNCED = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos', 'journal', 'policy'] as const
+export const SYNCED = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos', 'journal', 'policy', 'journalMedia'] as const
 export const SYNCED_KV = ['quest', 'feeds', 'prefs', 'choreTemplates']
 
 const isRemote = () => !!(Dexie.currentTransaction as unknown as { remote?: boolean } | null)?.remote
