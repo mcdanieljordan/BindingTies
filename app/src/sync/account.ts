@@ -24,6 +24,12 @@ export async function signIn(email: string, password: string) {
   if (error) throw error
 }
 export const signOut = () => sb!.auth.signOut()
+/** Permanently deletes this login (and the whole family if this is its last parent). Needed by Google Play and Apple. */
+export async function deleteMyAccount() {
+  const { error } = await sb!.functions.invoke('delete-account', { body: { confirm: 'DELETE' } })
+  if (error) throw new Error('Could not delete the account. Check your connection and try again.')
+  await sb!.auth.signOut({ scope: 'local' }).catch(() => {})
+}
 
 export async function myFamily(): Promise<FamilyInfo | null> {
   const { data, error } = await sb!.rpc('my_membership')

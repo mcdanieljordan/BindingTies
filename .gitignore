@@ -4,3 +4,4 @@ dist
 supabase/.secrets/
 *.local
 BindingTies.apk
+release/
