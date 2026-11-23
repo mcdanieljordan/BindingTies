@@ -25,6 +25,8 @@ import { captureInvite, linkMember, myFamily, resolveInvite, signOut, type Famil
 import { startSync, stopSync, syncNow } from './sync/engine'
 import { useSyncStatus } from './sync/SyncPanel'
 import { refreshFeeds } from './lib/feeds'
+import { onCalendarFile } from './lib/native'
+import ImportCalendar from './components/ImportCalendar'
 
 const NAV = [
   { id: 'today', label: 'Today', I: Home },
@@ -51,6 +53,7 @@ export default function App() {
   const [fam, setFam] = useState<FamilyInfo | null | undefined>(undefined) // undefined = checking
   const [waited, setWaited] = useState(false)
   const [view, setView] = useState<string>('today')
+  const [icsText, setIcsText] = useState<string | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [wall, setWall] = useState(false)
   const members = useLiveQuery(() => db.members.toArray(), [])
@@ -123,6 +126,8 @@ export default function App() {
     return () => { clearTimeout(t); clearInterval(i) }
   }, [canFeed])
 
+  useEffect(() => onCalendarFile((t) => setIcsText(t)), [])
+
   if (!loaded || members === undefined || me === null) return null
   const limited = fam?.status === 'approved' && fam.access === 'limited'
   const nav = NAV.filter((n) => !(limited && n.id === 'vault'))
@@ -188,6 +193,7 @@ export default function App() {
         ))}
       </div>
       {wall && <Wall onExit={() => setWall(false)} />}
+      {icsText && !limited && <ImportCalendar initialText={icsText} onClose={() => setIcsText(null)} onDone={() => setView('calendar')} />}
     </AppCtx.Provider>
   )
 }

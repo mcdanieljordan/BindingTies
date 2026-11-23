@@ -9,7 +9,7 @@ import { getFeeds, loadFeed, normalizeUrl, refreshFeeds, saveEvents, subscribe, 
 type Mode = 'file' | 'link'
 interface Preview { res: IcsResult; source: string; name: string }
 
-export default function ImportCalendar({ onClose, onDone }: { onClose: () => void; onDone: (firstDate?: string) => void }) {
+export default function ImportCalendar({ onClose, onDone, initialText, initialName }: { onClose: () => void; onDone: (firstDate?: string) => void; initialText?: string; initialName?: string }) {
   const members = useMembers()
   const [mode, setMode] = useState<Mode>('file')
   const [link, setLink] = useState('')
@@ -24,15 +24,18 @@ export default function ImportCalendar({ onClose, onDone }: { onClose: () => voi
   const loadFeeds = () => getFeeds().then(setFeeds)
   useEffect(() => { void loadFeeds() }, [])
 
+  useEffect(() => { if (initialText) void readText(initialText, initialName ?? 'Calendar file') }, [initialText]) // eslint-disable-line react-hooks/exhaustive-deps
+
   async function onFile(f?: File) {
-    if (!f) return
+    if (f) await readText(await f.text(), f.name)
+  }
+  async function readText(text: string, name: string) {
     setErr(''); setMsg('')
     try {
-      const text = await f.text()
       if (!/BEGIN:VCALENDAR/i.test(text)) throw new Error('That file is not a calendar (.ics) file.')
       const res = parseIcs(text)
       if (!res.events.length) throw new Error(res.skippedPast ? `Everything in that file is in the past (${res.skippedPast} events).` : 'No events found in that file.')
-      setPrev({ res, source: 'file', name: f.name }); setSkip(new Set())
+      setPrev({ res, source: 'file', name }); setSkip(new Set())
     } catch (e) { setErr((e as Error).message) }
   }
   async function onLink() {
