@@ -22,8 +22,12 @@ function occursOn(e: Record<string, any>, date: string) {
   if (typeof e.date !== 'string' || date < e.date) return false
   if (e.repeat === 'none' || !e.repeat) return e.date === date
   if (e.repeat === 'daily') return true
-  if (e.repeat === 'weekly') return dayOf(e.date).getUTCDay() === dayOf(date).getUTCDay()
+  if (e.repeat === 'weekly') return Array.isArray(e.days) && e.days.length ? e.days.map(Number).includes(dayOf(date).getUTCDay()) : dayOf(e.date).getUTCDay() === dayOf(date).getUTCDay()
   return dayOf(e.date).getUTCDate() === dayOf(date).getUTCDate()
+}
+function timesOn(e: Record<string, any>, date: string): { start?: string; end?: string } {
+  const t = e.repeat === 'weekly' && Array.isArray(e.days) && e.days.length ? e.dayTimes?.[String(dayOf(date).getUTCDay())] : undefined
+  return t?.start ? { start: t.start, end: t.end || undefined } : { start: e.start, end: e.end }
 }
 const contacts = (v: unknown) => (Array.isArray(v) ? v : []).slice(0, 12).map((c: any) => ({ name: str(c?.name, 80), relation: str(c?.relation, 80), phone: str(c?.phone, 40) })).filter((c) => c.name || c.phone)
 
@@ -68,7 +72,7 @@ Deno.serve(async (req) => {
         const e = r.data as Record<string, any>
         const who = (Array.isArray(e.memberIds) ? e.memberIds : []).map(Number)
         if (!occursOn(e, d) || (who.length && !who.some((w: number) => ids.includes(w)))) continue
-        schedule.push({ date: d, title: str(e.title, 120), start: str(e.start, 5), end: str(e.end, 5), notes: str(e.notes, 200), who: who.map(name).filter(Boolean), driver: name(e.driverId) })
+        schedule.push({ date: d, title: str(e.title, 120), start: str(timesOn(e, d).start, 5), end: str(timesOn(e, d).end, 5), notes: str(e.notes, 200), who: who.map(name).filter(Boolean), driver: name(e.driverId) })
       }
     }
     schedule.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.start ?? '').localeCompare(String(b.start ?? '')))

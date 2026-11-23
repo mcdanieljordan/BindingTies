@@ -1,6 +1,6 @@
 import confetti from 'canvas-confetti'
 import { db, getKV, type Quest, DEFAULT_QUEST } from '../db'
-import { ymd, nowHm, todayStr, parseYmd, pad, occursOn } from './dates'
+import { ymd, nowHm, todayStr, parseYmd, pad, occursOn, timesOn } from './dates'
 
 /* ---------- settings ---------- */
 export type Skin = 'quest' | 'calm'
@@ -95,11 +95,12 @@ export function startScheduler(toast: ToastFn) {
     // events with reminders
     const events = await db.events.toArray()
     for (const e of events) {
-      if (!e.start || !e.remindMin || !occursOn(e, today)) continue
-      const [h, m] = e.start.split(':').map(Number)
+      const st = timesOn(e, today).start
+      if (!st || !e.remindMin || !occursOn(e, today)) continue
+      const [h, m] = st.split(':').map(Number)
       const at = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime() - e.remindMin * 60000
       if (Date.now() >= at && Date.now() < at + 5 * 60000 && once(`ev-${e.id}-${today}`)) {
-        await fire(`Coming up: ${e.title}`, `Starts at ${e.start}${e.remindMin ? ` (in ~${e.remindMin} min)` : ''}`)
+        await fire(`Coming up: ${e.title}`, `Starts at ${st}${e.remindMin ? ` (in ~${e.remindMin} min)` : ''}`)
       }
     }
     // alarms

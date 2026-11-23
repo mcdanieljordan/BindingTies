@@ -8,7 +8,7 @@ import { Modal, PageHead, MemberChip, Empty, MemberPick } from '../components/ui
 import { useLiveQuery } from 'dexie-react-hooks'
 import { canSee } from '../lib/journal'
 import { useEvents, useMembers } from '../lib/useData'
-import { DOW, eventsOn, fmtDate, fmtTime, pad, todayStr, ymd } from '../lib/dates'
+import { DOW, eventsOn, fmtDate, fmtTime, pad, parseYmd, todayStr, ymd } from '../lib/dates'
 
 const blank = (date: string): Partial<EventItem> => ({ title: '', date, start: '', end: '', memberIds: [], remindMin: 30, repeat: 'none', notes: '' })
 
@@ -71,6 +71,13 @@ export default function CalendarView() {
   async function save() {
     if (!edit?.title?.trim()) return
     const rec = { ...edit, title: edit.title.trim(), start: edit.start || undefined, end: edit.end || undefined } as EventItem
+    if (rec.repeat === 'weekly' && rec.days?.length) {
+      rec.days = [...new Set(rec.days)].sort()
+      const dt: NonNullable<EventItem['dayTimes']> = {}
+      for (const d of rec.days) { const t = rec.dayTimes?.[d]; if (t?.start) dt[d] = { start: t.start, end: t.end || undefined } }
+      rec.dayTimes = Object.keys(dt).length ? dt : undefined
+      if (rec.days.length === 1 && rec.days[0] === parseYmd(rec.date).getDay() && !rec.dayTimes) rec.days = undefined
+    } else { rec.days = undefined; rec.dayTimes = undefined }
     if (rec.id) await db.events.put(rec); else await db.events.add(rec as never)
     setSel(rec.date); setEdit(null); setCopying(false)
   }
@@ -130,9 +137,9 @@ export default function CalendarView() {
             {dayEvents.length === 0 && <Empty>No events this day.</Empty>}
             {dayEvents.map((e) => (
               <div key={e.id} className="item" style={{ borderLeft: `6px solid ${mem(e.memberIds[0])?.color ?? 'var(--primary)'}` }}>
-                <div className="grow" onClick={() => setEdit(e)} style={{ cursor: 'pointer' }}>
+                <div className="grow" onClick={() => setEdit(events.find((x) => x.id === e.id) ?? e)} style={{ cursor: 'pointer' }}>
                   <div className="title">{e.title}</div>
-                  <div className="muted">{e.start ? `${fmtTime(e.start)}${e.end ? ' – ' + fmtTime(e.end) : ''}` : 'All day'}{e.repeat !== 'none' ? ` • repeats ${e.repeat}` : ''}{e.remindMin ? ` • remind ${e.remindMin}m before` : ''}</div>
+                  <div className="muted">{e.start ? `${fmtTime(e.start)}${e.end ? ' – ' + fmtTime(e.end) : ''}` : 'All day'}{e.repeat !== 'none' ? ` • repeats ${e.repeat === 'weekly' && e.days?.length ? e.days.map((d) => DOW[d]).join('/') : e.repeat}` : ''}{e.remindMin ? ` • remind ${e.remindMin}m before` : ''}</div>
                   <div className="row" style={{ marginTop: 4 }}>{e.memberIds.map((i) => <MemberChip key={i} m={mem(i)} />)}{e.driverId && <span className="chip">Driver: {mem(e.driverId)?.name}</span>}</div>
                 </div>
                 <button className="btn ghost sm" aria-label={`Copy ${e.title}`} onClick={() => copyEvent(e)}><Copy size={16} /></button>
@@ -162,9 +169,29 @@ export default function CalendarView() {
             </div>
             <div className="row">
               <label className="f">Driver / pickup<MemberPick any anyLabel="None" members={members.filter((m) => m.role === 'parent' || m.role === 'caregiver')} value={edit.driverId} onChange={(v) => setEdit({ ...edit, driverId: v })} /></label>
-              <label className="f">Repeats<select value={edit.repeat} onChange={(e) => setEdit({ ...edit, repeat: e.target.value as Repeat })}><option value="none">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+              <label className="f">Repeats<select value={edit.repeat} onChange={(e) => { const r = e.target.value as Repeat; setEdit({ ...edit, repeat: r, days: r === 'weekly' && !edit.days?.length ? [parseYmd(edit.date!).getDay()] : edit.days }) }}><option value="none">Never</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
               <label className="f">Remind me<select value={edit.remindMin} onChange={(e) => setEdit({ ...edit, remindMin: Number(e.target.value) })}><option value={0}>No reminder</option><option value={5}>5 min before</option><option value={15}>15 min before</option><option value={30}>30 min before</option><option value={60}>1 hour before</option><option value={120}>2 hours before</option></select></label>
             </div>
+            {edit.repeat === 'weekly' && (() => {
+              const days = edit.days?.length ? edit.days : [parseYmd(edit.date!).getDay()]
+              const toggle = (d: number) => { const n = days.includes(d) ? days.filter((x) => x !== d) : [...days, d]; if (n.length) setEdit({ ...edit, days: n.sort() }) }
+              const setT = (d: number, k: 'start' | 'end', v: string) => setEdit({ ...edit, days, dayTimes: { ...edit.dayTimes, [d]: { ...edit.dayTimes?.[d], [k]: v } } })
+              return (
+                <div className="stack" style={{ gap: 6 }}>
+                  <div className="muted">Which days of the week?</div>
+                  <div className="row">{DOW.map((n, d) => <button key={d} type="button" className={`tab ${days.includes(d) ? 'on' : ''}`} onClick={() => toggle(d)}>{n}</button>)}</div>
+                  {days.length > 0 && <div className="muted small">Different time on a day? Fill it in below. Blank uses the Start/End above.</div>}
+                  {days.map((d) => (
+                    <div className="row" key={d} style={{ alignItems: 'center' }}>
+                      <b style={{ width: 44 }}>{DOW[d]}</b>
+                      <input type="time" aria-label={`${DOW[d]} start`} value={edit.dayTimes?.[d]?.start ?? ''} onChange={(e) => setT(d, 'start', e.target.value)} />
+                      <span className="muted">to</span>
+                      <input type="time" aria-label={`${DOW[d]} end`} value={edit.dayTimes?.[d]?.end ?? ''} onChange={(e) => setT(d, 'end', e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
             <label className="f">Notes<textarea rows={2} value={edit.notes ?? ''} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></label>
             <div className="row between"><span className="row" style={{ gap: 8 }}>{edit.id && <button className="btn" onClick={() => copyEvent(edit as EventItem)}><Copy size={14} /> Make a copy</button>}<span className="muted small">Turn on alerts in Settings to get reminders even when the app is closed.</span></span><button className="btn primary" onClick={save}>Save</button></div>
           </div>

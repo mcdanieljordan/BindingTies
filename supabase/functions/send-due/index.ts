@@ -20,8 +20,12 @@ function occursOn(e: Record<string, any>, date: string) {
   if (date < e.date) return false
   if (e.repeat === 'none' || !e.repeat) return e.date === date
   if (e.repeat === 'daily') return true
-  if (e.repeat === 'weekly') return dayOf(e.date).getUTCDay() === dayOf(date).getUTCDay()
+  if (e.repeat === 'weekly') return Array.isArray(e.days) && e.days.length ? e.days.map(Number).includes(dayOf(date).getUTCDay()) : dayOf(e.date).getUTCDay() === dayOf(date).getUTCDay()
   return dayOf(e.date).getUTCDate() === dayOf(date).getUTCDate()
+}
+function timesOn(e: Record<string, any>, date: string): { start?: string; end?: string } {
+  const t = e.repeat === 'weekly' && Array.isArray(e.days) && e.days.length ? e.dayTimes?.[String(dayOf(date).getUTCDay())] : undefined
+  return t?.start ? { start: t.start, end: t.end || undefined } : { start: e.start, end: e.end }
 }
 
 function buildMessages(fid: string, recs: Rec[], tz: string): Msg[] {
@@ -32,9 +36,10 @@ function buildMessages(fid: string, recs: Rec[], tz: string): Msg[] {
   const out: Msg[] = []
 
   for (const { rid, data: e } of by('events')) {
-    if (!e.start || !e.remindMin || !occursOn(e, today)) continue
-    const at = hm(e.start) - e.remindMin
-    if (mins >= at && mins < at + 5) out.push({ key: `ev:${fid}:${rid}:${today}`, title: `Coming up: ${e.title}`, body: `Starts at ${fmt12(e.start)}`, who: (e.memberIds ?? []).map(Number) })
+    const st = timesOn(e, today).start
+    if (!st || !e.remindMin || !occursOn(e, today)) continue
+    const at = hm(st) - e.remindMin
+    if (mins >= at && mins < at + 5) out.push({ key: `ev:${fid}:${rid}:${today}`, title: `Coming up: ${e.title}`, body: `Starts at ${fmt12(st)}`, who: (e.memberIds ?? []).map(Number) })
   }
   for (const { rid, data: a } of by('alarms')) {
     if (!a.enabled || !a.time) continue

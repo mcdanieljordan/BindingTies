@@ -36,10 +36,16 @@ export function occursOn(e: EventItem, date: string): boolean {
   if (e.repeat === 'daily') return true
   const a = parseYmd(e.date)
   const b = parseYmd(date)
-  if (e.repeat === 'weekly') return a.getDay() === b.getDay()
+  if (e.repeat === 'weekly') return e.days?.length ? e.days.includes(b.getDay()) : a.getDay() === b.getDay()
   return a.getDate() === b.getDate()
+}
+/** Start/end for a given day (a weekly event can have its own time on some weekdays). */
+export function timesOn(e: EventItem, date: string): { start?: string; end?: string } {
+  const t = e.repeat === 'weekly' && e.days?.length ? e.dayTimes?.[String(parseYmd(date).getDay())] : undefined
+  return t?.start ? { start: t.start, end: t.end || undefined } : { start: e.start, end: e.end }
 }
 export const eventsOn = (events: EventItem[], date: string) =>
   events
     .filter((e) => occursOn(e, date))
+    .map((e) => ({ ...e, ...timesOn(e, date) }))
     .sort((a, b) => (a.start ?? '00:00').localeCompare(b.start ?? '00:00'))

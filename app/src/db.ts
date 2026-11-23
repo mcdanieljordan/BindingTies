@@ -23,6 +23,10 @@ export interface EventItem {
   driverId?: number
   remindMin: number
   repeat: Repeat
+  /** weekly only: which weekdays (0=Sun..6=Sat). Empty/missing = the weekday of `date`. */
+  days?: number[]
+  /** weekly only: a different start/end on a given weekday (key = weekday number) */
+  dayTimes?: Record<string, { start?: string; end?: string }>
   notes?: string
   /** set when the event came from a subscribed calendar link */
   feed?: string
