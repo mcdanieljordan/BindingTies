@@ -24,6 +24,7 @@ import { syncConfigured } from './sync/client'
 import { captureInvite, linkMember, myFamily, resolveInvite, signOut, type FamilyInfo } from './sync/account'
 import { startSync, stopSync, syncNow } from './sync/engine'
 import { useSyncStatus } from './sync/SyncPanel'
+import { refreshFeeds } from './lib/feeds'
 
 const NAV = [
   { id: 'today', label: 'Today', I: Home },
@@ -113,6 +114,14 @@ export default function App() {
     if (session.uid) { try { await syncNow(fam!.id) } catch { /* keep going */ } await signOut() }
     stopSync(); await wipeLocal(); await setKV('localOnly', false); setLocalOnly(false); setFam(null); setMeState(undefined); setWaited(false)
   }
+
+  const canFeed = loaded && (members?.length ?? 0) > 0 && !(fam?.status === 'approved' && fam.access === 'limited')
+  useEffect(() => {
+    if (!canFeed) return
+    const t = setTimeout(() => void refreshFeeds(), 5000)
+    const i = setInterval(() => void refreshFeeds(), 3600_000)
+    return () => { clearTimeout(t); clearInterval(i) }
+  }, [canFeed])
 
   if (!loaded || members === undefined || me === null) return null
   const limited = fam?.status === 'approved' && fam.access === 'limited'

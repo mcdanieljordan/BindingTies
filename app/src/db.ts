@@ -24,6 +24,8 @@ export interface EventItem {
   remindMin: number
   repeat: Repeat
   notes?: string
+  /** set when the event came from a subscribed calendar link */
+  feed?: string
 }
 export interface Step {
   id: string
@@ -197,7 +199,7 @@ db.version(1).stores({
 /* Random ids that stay unique across devices (fits safely in a JS number). */
 export const newId = () => Math.floor(Math.random() * 2 ** 48) + 1
 export const SYNCED = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos'] as const
-export const SYNCED_KV = ['quest']
+export const SYNCED_KV = ['quest', 'feeds']
 
 const isRemote = () => !!(Dexie.currentTransaction as unknown as { remote?: boolean } | null)?.remote
 const queue = (tbl: string, rid: unknown) => {

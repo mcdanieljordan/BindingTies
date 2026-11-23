@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Trash2, Wand2 } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, ChevronRight, Plus, Trash2, Wand2 } from 'lucide-react'
 import * as chrono from 'chrono-node'
 import { db, type EventItem, type Repeat } from '../db'
+import ImportCalendar from '../components/ImportCalendar'
+import { useApp } from '../ctx'
 import { Modal, PageHead, MemberChip, Empty, MemberPick } from '../components/ui'
 import { useEvents, useMembers } from '../lib/useData'
 import { DOW, eventsOn, fmtDate, fmtTime, pad, todayStr, ymd } from '../lib/dates'
@@ -15,6 +17,8 @@ export default function CalendarView() {
   const [sel, setSel] = useState(todayStr())
   const [edit, setEdit] = useState<Partial<EventItem> | null>(null)
   const [nl, setNl] = useState('')
+  const [imp, setImp] = useState(false)
+  const app = useApp()
   const mem = (id?: number) => members.find((m) => m.id === id)
 
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
@@ -57,6 +61,7 @@ export default function CalendarView() {
   return (
     <>
       <PageHead title="Family calendar" sub="Type a sentence, check it, save it.">
+        {app.family?.access !== 'limited' && <button className="btn" onClick={() => setImp(true)}><CalendarPlus size={16} />Import / follow</button>}
         <button className="btn primary" onClick={() => setEdit(blank(sel))}><Plus size={16} />Add event</button>
       </PageHead>
       <div className="card no-print">
@@ -107,6 +112,7 @@ export default function CalendarView() {
         </div>
       </div>
 
+      {imp && <ImportCalendar onClose={() => setImp(false)} onDone={(d) => { if (d) { setSel(d); const x = new Date(d + 'T00:00:00'); setCursor(new Date(x.getFullYear(), x.getMonth(), 1)) } }} />}
       {edit && (
         <Modal title={edit.id ? 'Edit event' : 'New event'} onClose={() => setEdit(null)}>
           <div className="stack">
