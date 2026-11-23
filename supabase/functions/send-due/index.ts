@@ -93,9 +93,10 @@ Deno.serve(async (req) => {
   const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]))
   if (!cfg.cron_secret || req.headers.get('x-cron-secret') !== cfg.cron_secret) return new Response('forbidden', { status: 403 })
   const priv = Deno.env.get('VAPID_PRIVATE_KEY')
-  const webOk = !!(priv && cfg.vapid_public)
-  if (!webOk && !fcmSA) return new Response('No push keys configured', { status: 500 })
-  if (webOk) webpush.setVapidDetails(cfg.vapid_subject ?? 'mailto:noreply@example.com', cfg.vapid_public, priv!)
+  let webOk = !!(priv && cfg.vapid_public)
+  // a badly pasted web key must not stop Android pushes
+  if (webOk) { try { webpush.setVapidDetails(cfg.vapid_subject ?? 'mailto:noreply@example.com', cfg.vapid_public, priv!.trim()) } catch (e) { console.error('Web push key is invalid:', (e as Error).message); webOk = false } }
+  if (!webOk && !fcmSA) return new Response('No working push keys configured', { status: 500 })
 
   const { data: subs } = await sb.from('push_subscriptions').select('id,user_id,family_id,endpoint,p256dh,auth')
   const famIds = [...new Set((subs ?? []).map((s) => s.family_id))]
