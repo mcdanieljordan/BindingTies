@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(IcsIntentPlugin.class);
+        registerPlugin(SaveFilePlugin.class);
         super.onCreate(savedInstanceState);
         readCalendar(getIntent());
     }
