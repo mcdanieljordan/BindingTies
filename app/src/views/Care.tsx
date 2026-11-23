@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AlarmClock, BellRing, Pill, Plus, Timer as TimerIcon, Trash2, Lock } from 'lucide-react'
+import { AlarmClock, BellRing, Pill, Plus, ShieldAlert, Timer as TimerIcon, Trash2, Lock } from 'lucide-react'
+import Emergency from './Emergency'
 import { db } from '../db'
 import { Empty, MemberPick, PageHead, Ring, Who } from '../components/ui'
 import { useAlarms, useDoses, useMeds, useMembers, useTimers } from '../lib/useData'
@@ -10,18 +11,20 @@ import { useApp } from '../ctx'
 export default function Care() {
   const { family } = useApp()
   const limited = family?.status === 'approved' && family.access === 'limited'
-  const [tab, setTab] = useState<'meds' | 'timers' | 'alarms'>(limited ? 'timers' : 'meds')
+  const [tab, setTab] = useState<'meds' | 'timers' | 'alarms' | 'emergency'>(limited ? 'timers' : 'meds')
   return (
     <>
-      <PageHead title="Care & time" sub={limited ? 'Countdown timers and repeating alarms.' : 'Medicine log, countdown timers and repeating alarms.'} />
+      <PageHead title="Care & time" sub={limited ? 'Countdown timers and repeating alarms.' : 'Medicine log, timers, alarms and emergency info.'} />
       <div className="tabs">
         {!limited && <button className={`tab ${tab === 'meds' ? 'on' : ''}`} onClick={() => setTab('meds')}><Pill size={14} style={{ verticalAlign: -2 }} /> Medicine</button>}
         <button className={`tab ${tab === 'timers' ? 'on' : ''}`} onClick={() => setTab('timers')}><TimerIcon size={14} style={{ verticalAlign: -2 }} /> Timers</button>
         <button className={`tab ${tab === 'alarms' ? 'on' : ''}`} onClick={() => setTab('alarms')}><AlarmClock size={14} style={{ verticalAlign: -2 }} /> Alarms</button>
+        {!limited && <button className={`tab ${tab === 'emergency' ? 'on' : ''}`} onClick={() => setTab('emergency')}><ShieldAlert size={14} style={{ verticalAlign: -2 }} /> Emergency</button>}
       </div>
       {tab === 'meds' && <Meds />}
       {tab === 'timers' && <Timers />}
       {tab === 'alarms' && <Alarms />}
+      {tab === 'emergency' && !limited && <Emergency />}
     </>
   )
 }

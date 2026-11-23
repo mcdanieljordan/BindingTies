@@ -13,7 +13,7 @@ import SyncPanel from '../sync/SyncPanel'
 import InviteModal from '../sync/InviteModal'
 
 const COLORS = ['#8d7bff', '#50e0bd', '#ff7fb2', '#ffca70', '#5db7ff', '#ff9a62', '#b6e35a', '#e08cff']
-const tables = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos', 'journal', 'policy', 'kv'] as const
+const tables = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos', 'journal', 'policy', 'journalMedia', 'emergency', 'kv'] as const
 
 const blobToData = (b: Blob) => new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(b) })
 const dataToBlob = async (u: string) => (await fetch(u)).blob()
