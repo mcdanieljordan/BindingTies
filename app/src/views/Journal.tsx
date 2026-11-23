@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Lock, Plus, Search, Settings2, Target, Trash2, X } from 'lucide-react'
+import { Lock, Plus, Printer, Search, Settings2, Target, Trash2, X } from 'lucide-react'
 import { db, newId, type JournalEntry, type JournalGoal, type JournalMedia, type Member } from '../db'
 import { AttachBar, MediaList } from '../components/JournalMedia'
+import PrintJournal from '../components/PrintJournal'
 import { fmtSize, removeMedia } from '../lib/media'
 import { Empty, Modal, PageHead, Who } from '../components/ui'
 import { useMembers } from '../lib/useData'
@@ -28,6 +29,7 @@ export default function Journal() {
   const [edit, setEdit] = useState<Draft | null>(null)
   const [read, setRead] = useState<JournalEntry | null>(null)
   const [lockOpen, setLockOpen] = useState(false)
+  const [printOpen, setPrintOpen] = useState(false)
   const [pin, setPin] = useState('')
   const [unlocked, setUn] = useState(false)
   const [hasPin, setHasPin] = useState(false)
@@ -129,6 +131,7 @@ export default function Journal() {
     <>
       <PageHead title="Journal" sub="Write it down, look back, plan ahead. Only the people you choose can read it.">
         <button className="btn" aria-label="Journal lock" onClick={() => setLockOpen(true)}><Settings2 size={16} /></button>
+        <button className="btn" onClick={() => setPrintOpen(true)}><Printer size={16} />Print / PDF</button>
         {canWrite && <button className="btn" onClick={() => setEdit(blank(addDays(today, 1), 'plan'))}><Target size={16} />Plan a day</button>}
         {canWrite && <button className="btn primary" onClick={() => setEdit(blank(onDay || today, 'note'))}><Plus size={16} />New entry</button>}
       </PageHead>
@@ -241,6 +244,8 @@ export default function Journal() {
           </div>
         </Modal>
       )}
+
+      {printOpen && <PrintJournal entries={visible} media={allMedia} members={members} me={meM} onClose={() => setPrintOpen(false)} />}
 
       {lockOpen && (
         <Modal title="Journal lock" onClose={() => { setLockOpen(false); setPin('') }}>

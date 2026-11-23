@@ -75,3 +75,12 @@ export async function removeMedia(m: JournalMedia) {
 
 /** The types a voice recording can use here (Android and desktop: webm; iPhone: mp4). */
 export const recorderType = () => ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'].find((t) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(t))
+
+/** The actual bytes of a file (local copy, or downloaded through a private link). */
+export async function mediaBlob(m: JournalMedia): Promise<Blob | null> {
+  if (m.blob) return m.blob
+  if (!sb || !m.blobPath) return null
+  const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(m.blobPath, 600)
+  if (error || !data) return null
+  try { const r = await fetch(data.signedUrl); return r.ok ? await r.blob() : null } catch { return null }
+}
