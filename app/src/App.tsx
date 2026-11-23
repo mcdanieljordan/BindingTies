@@ -21,11 +21,11 @@ import WhoIs from './views/WhoIs'
 import Pending from './views/Pending'
 import { useSession } from './sync/useSession'
 import { syncConfigured } from './sync/client'
-import { captureInvite, linkMember, myFamily, resolveInvite, signOut, type FamilyInfo } from './sync/account'
+import { captureInvite, finishNativeAuth, linkMember, myFamily, resolveInvite, signOut, type FamilyInfo } from './sync/account'
 import { startSync, stopSync, syncNow } from './sync/engine'
 import { useSyncStatus } from './sync/SyncPanel'
 import { refreshFeeds } from './lib/feeds'
-import { onCalendarFile } from './lib/native'
+import { listenForAuthLink, onCalendarFile } from './lib/native'
 import ImportCalendar from './components/ImportCalendar'
 
 const NAV = [
@@ -40,6 +40,7 @@ const NAV = [
 ] as const
 
 captureInvite()
+listenForAuthLink(finishNativeAuth)
 
 const Splash = ({ text }: { text: string }) => <div className="gate"><div className="gate-card"><div className="gate-logo"><Home size={38} /></div><h1>{text}</h1></div></div>
 

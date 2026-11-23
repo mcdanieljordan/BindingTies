@@ -22,3 +22,12 @@ Not yet verified end to end with a real email attachment.
 3. Replace Web Push with Firebase Cloud Messaging + native local notifications for alarms/timers.
 4. Play Console ($25 one-time): data-safety form, privacy policy URL (`/privacy.html`), account deletion in app,
    closed test with 12 testers for 14 days (personal accounts).
+
+## Native Google sign-in and push (setup)
+- Google sign-in opens the phone's browser and returns via `com.familyos.app://auth`.
+  Add that URL to Supabase → Authentication → URL Configuration → Redirect URLs.
+- Push uses Firebase Cloud Messaging:
+  1. Firebase console → add project → add Android app `com.familyos.app` → download `google-services.json` into `app/android/app/`.
+  2. Firebase → Project settings → Service accounts → generate a private key (JSON) and save it as the Supabase
+     Edge Function secret `FCM_SERVICE_ACCOUNT` (paste the whole JSON).
+  3. Redeploy `send-due` (it sends to FCM tokens stored as `fcm:<token>` in `push_subscriptions`).

@@ -11,3 +11,14 @@ export function onCalendarFile(cb: (text: string) => void) {
   window.addEventListener('fos-ics', check)
   return () => window.removeEventListener('fos-ics', check)
 }
+
+export const NATIVE_AUTH_URL = 'com.familyos.app://auth'
+
+/** Finishes Google sign-in when the phone's browser sends the person back to the app. */
+export function listenForAuthLink(finish: (url: string) => Promise<void>) {
+  if (!isNative) return
+  void import('@capacitor/app').then(({ App }) => App.addListener('appUrlOpen', ({ url }) => {
+    if (!url.startsWith(NATIVE_AUTH_URL)) return
+    void finish(url).finally(() => void import('@capacitor/browser').then(({ Browser }) => Browser.close()).catch(() => {}))
+  }))
+}

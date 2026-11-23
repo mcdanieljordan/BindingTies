@@ -1,4 +1,7 @@
 import { sb, VAPID_PUBLIC } from './client'
+import { Browser } from '@capacitor/browser'
+import { PushNotifications } from '@capacitor/push-notifications'
+import { isNative, NATIVE_AUTH_URL } from '../lib/native'
 
 export type Access = 'full' | 'limited'
 export interface FamilyInfo { id: string; name: string; invite_code: string; tz: string; status: 'pending' | 'approved'; member_id: number | null; role: 'owner' | 'parent' | 'member'; access?: Access }
@@ -110,13 +113,29 @@ export async function linkMember(fid: string, memberId: number) {
 }
 
 /* ---------- Web Push ---------- */
-export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && !!VAPID_PUBLIC
+export const pushSupported = () => isNative || 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && !!VAPID_PUBLIC
 const b64 = (s: string) => {
   const p = '='.repeat((4 - (s.length % 4)) % 4)
   const raw = atob((s + p).replace(/-/g, '+').replace(/_/g, '/'))
   return Uint8Array.from(raw, (c) => c.charCodeAt(0))
 }
+const FCM_KEY = 'fos-fcm'
+async function fcmToken(): Promise<string> {
+  const perm = await PushNotifications.requestPermissions()
+  if (perm.receive !== 'granted') throw new Error('Notifications were not allowed. You can allow them in Android Settings → Apps → FamilyOS.')
+  await PushNotifications.removeAllListeners()
+  await PushNotifications.createChannel({ id: 'alerts', name: 'Family alerts', description: 'Events, alarms, timers and medicine', importance: 5, visibility: 1, vibration: true })
+  return new Promise<string>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('Could not reach the notification service. Check your connection and try again.')), 15000)
+    void PushNotifications.addListener('registration', (r) => { clearTimeout(t); resolve(r.value) })
+    void PushNotifications.addListener('registrationError', (e) => { clearTimeout(t); reject(new Error(e.error || 'Notifications are not set up in this build yet.')) })
+    void PushNotifications.register()
+  })
+}
 export async function pushActive() {
+  if (isNative) {
+    try { return localStorage.getItem('fos-push') === '1' && (await PushNotifications.checkPermissions()).receive === 'granted' } catch { return false }
+  }
   if (!pushSupported()) return false
   const reg = await navigator.serviceWorker.ready
   const on = !!(await reg.pushManager.getSubscription()) && Notification.permission === 'granted'
@@ -124,6 +143,14 @@ export async function pushActive() {
   return on
 }
 export async function enablePush(familyId: string) {
+  if (isNative) {
+    const token = await fcmToken()
+    const user = await currentUser()
+    const { error } = await sb!.from('push_subscriptions').upsert({ user_id: user!.id, family_id: familyId, endpoint: `fcm:${token}`, p256dh: 'fcm', auth: 'fcm', ua: 'android-app' }, { onConflict: 'endpoint' })
+    if (error) throw error
+    try { localStorage.setItem('fos-push', '1'); localStorage.setItem(FCM_KEY, token) } catch { /* ignore */ }
+    return
+  }
   if (!pushSupported()) throw new Error('This browser does not support push. On iPhone, add FamilyOS to the Home Screen first.')
   const perm = await Notification.requestPermission()
   if (perm !== 'granted') throw new Error('Notifications were not allowed.')
@@ -136,6 +163,11 @@ export async function enablePush(familyId: string) {
   try { localStorage.setItem('fos-push', '1') } catch { /* ignore */ }
 }
 export async function disablePush() {
+  if (isNative) {
+    try { const t = localStorage.getItem(FCM_KEY); if (t) await sb!.from('push_subscriptions').delete().eq('endpoint', `fcm:${t}`) } catch { /* ignore */ }
+    try { localStorage.setItem('fos-push', '0') } catch { /* ignore */ }
+    return
+  }
   const reg = await navigator.serviceWorker.ready
   const sub = await reg.pushManager.getSubscription()
   if (sub) { await sb!.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe() }
@@ -144,10 +176,30 @@ export async function disablePush() {
 
 export const googleEnabled = import.meta.env.VITE_GOOGLE_ENABLED === 'true'
 export async function signInGoogle() {
+  if (isNative) {
+    // Google refuses sign-in inside an embedded view, so use the phone's browser and come back through a link
+    const { data, error } = await sb!.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: NATIVE_AUTH_URL, skipBrowserRedirect: true } })
+    if (error) throw error
+    await Browser.open({ url: data.url })
+    return
+  }
   const { error } = await sb!.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + import.meta.env.BASE_URL } })
   if (error) throw error
 }
 export async function resetPassword(email: string) {
   const { error } = await sb!.auth.resetPasswordForEmail(email, { redirectTo: location.origin + import.meta.env.BASE_URL })
   if (error) throw error
+}
+
+/** Reads the sign-in result from the link the browser sent back (works for both token and code styles). */
+export async function finishNativeAuth(url: string) {
+  const u = new URL(url.replace('com.familyos.app://', 'https://x/'))
+  const q = new URLSearchParams(u.search), h = new URLSearchParams(u.hash.replace(/^#/, ''))
+  const get = (k: string) => q.get(k) ?? h.get(k)
+  const err = get('error_description') ?? get('error')
+  if (err) throw new Error(err)
+  const code = get('code')
+  if (code) { const { error } = await sb!.auth.exchangeCodeForSession(code); if (error) throw error; return }
+  const access_token = get('access_token'), refresh_token = get('refresh_token')
+  if (access_token && refresh_token) { const { error } = await sb!.auth.setSession({ access_token, refresh_token }); if (error) throw error }
 }

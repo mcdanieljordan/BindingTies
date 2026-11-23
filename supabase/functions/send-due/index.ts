@@ -58,13 +58,44 @@ function buildMessages(fid: string, recs: Rec[], tz: string): Msg[] {
   return out
 }
 
+// ---- Android app pushes (Firebase Cloud Messaging, HTTP v1) ----
+const b64u = (b: ArrayBuffer | string) => btoa(typeof b === 'string' ? b : String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+let fcmCache: { token: string; exp: number } | null = null
+async function fcmAccess(sa: { client_email: string; private_key: string; token_uri?: string }) {
+  if (fcmCache && fcmCache.exp > Date.now() + 60_000) return fcmCache.token
+  const now = Math.floor(Date.now() / 1000)
+  const head = b64u(JSON.stringify({ alg: 'RS256', typ: 'JWT' }))
+  const claim = b64u(JSON.stringify({ iss: sa.client_email, scope: 'https://www.googleapis.com/auth/firebase.messaging', aud: sa.token_uri ?? 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }))
+  const der = Uint8Array.from(atob(sa.private_key.replace(/-----[^-]+-----|\s/g, '')), (c) => c.charCodeAt(0))
+  const key = await crypto.subtle.importKey('pkcs8', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign'])
+  const sig = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(`${head}.${claim}`))
+  const r = await fetch(sa.token_uri ?? 'https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${head}.${claim}.${b64u(sig)}` }) })
+  const j = await r.json()
+  if (!j.access_token) throw new Error('FCM auth failed')
+  fcmCache = { token: j.access_token, exp: Date.now() + (j.expires_in ?? 3600) * 1000 }
+  return fcmCache.token
+}
+const fcmSecret = Deno.env.get('FCM_SERVICE_ACCOUNT')
+const fcmSA = fcmSecret ? JSON.parse(fcmSecret) : null
+/** returns false when the phone's token is dead and should be forgotten */
+async function sendFcm(token: string, m: Msg) {
+  const r = await fetch(`https://fcm.googleapis.com/v1/projects/${fcmSA.project_id}/messages:send`, {
+    method: 'POST', headers: { Authorization: `Bearer ${await fcmAccess(fcmSA)}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: { token, notification: { title: m.title, body: m.body }, data: { url: '/' }, android: { priority: 'HIGH', ttl: '3600s', notification: { channel_id: 'alerts', tag: m.key } } } }),
+  })
+  if (r.ok) return true
+  if (r.status === 404) return false // UNREGISTERED: the app was removed or the token expired
+  throw new Error(`FCM ${r.status}`)
+}
+
 Deno.serve(async (req) => {
   const { data: cfgRows } = await sb.from('server_config').select('key,value')
   const cfg = Object.fromEntries((cfgRows ?? []).map((r) => [r.key, r.value]))
   if (!cfg.cron_secret || req.headers.get('x-cron-secret') !== cfg.cron_secret) return new Response('forbidden', { status: 403 })
   const priv = Deno.env.get('VAPID_PRIVATE_KEY')
-  if (!priv || !cfg.vapid_public) return new Response('VAPID keys not configured', { status: 500 })
-  webpush.setVapidDetails(cfg.vapid_subject ?? 'mailto:noreply@example.com', cfg.vapid_public, priv)
+  const webOk = !!(priv && cfg.vapid_public)
+  if (!webOk && !fcmSA) return new Response('No push keys configured', { status: 500 })
+  if (webOk) webpush.setVapidDetails(cfg.vapid_subject ?? 'mailto:noreply@example.com', cfg.vapid_public, priv!)
 
   const { data: subs } = await sb.from('push_subscriptions').select('id,user_id,family_id,endpoint,p256dh,auth')
   const famIds = [...new Set((subs ?? []).map((s) => s.family_id))]
@@ -90,6 +121,13 @@ Deno.serve(async (req) => {
     for (const m of msgs.filter((x) => freshKeys.has(x.key))) {
       for (const s of (subs ?? []).filter((x) => x.family_id === fid && wants(x.user_id, m))) {
         try {
+          if (s.endpoint.startsWith('fcm:')) {
+            if (!fcmSA) continue
+            if (await sendFcm(s.endpoint.slice(4), m)) sent++
+            else await sb.from('push_subscriptions').delete().eq('id', s.id)
+            continue
+          }
+          if (!webOk) continue
           await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify({ title: m.title, body: m.body, tag: m.key, urgent: m.urgent, url: '/' }), { TTL: 3600, urgency: 'high' })
           sent++
         } catch (e) {
