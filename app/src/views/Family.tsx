@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Gift, Hand, Plus, Settings2, Trash2, Trophy } from 'lucide-react'
-import { db, setKV, type Chore, type Quest } from '../db'
+import { Check, Gift, Hand, Plus, Settings2, Trash2, Trophy, X } from 'lucide-react'
+import { db, DEFAULT_PREFS, getKV, setKV, type Chore, type ChoreTemplate, type Prefs, type Quest } from '../db'
 import { Modal, PageHead, Empty, Who, MemberPick } from '../components/ui'
 import { useChores, useLedger, useMembers, useRewards } from '../lib/useData'
 import { award, celebrate, pointScale, questProgress, weekStart } from '../lib/engine'
-import { todayStr, fmtDate } from '../lib/dates'
+import { todayStr, fmtDate, ymd } from '../lib/dates'
+import { CHORE_PRESETS } from '../lib/seed'
+import { awards, standings } from '../lib/board'
 import { useApp } from '../ctx'
 
 const BADGES = [
@@ -16,7 +18,7 @@ const BADGES = [
 ]
 
 export default function Family() {
-  const { toast } = useApp()
+  const { toast, me, family } = useApp()
   const members = useMembers()
   const ledger = useLedger()
   const chores = useChores()
@@ -24,6 +26,10 @@ export default function Family() {
   const prog = useLiveQuery(questProgress, [ledger], undefined)
   const [editQuest, setEditQuest] = useState<Quest | null>(null)
   const [chore, setChore] = useState<Partial<Chore> | null>(null)
+  const [saveTpl, setSaveTpl] = useState(false)
+  const [setup, setSetup] = useState(false)
+  const prefs = useLiveQuery(async () => ({ ...DEFAULT_PREFS, ...(await getKV<Partial<Prefs>>('prefs', {})) }), [], DEFAULT_PREFS)
+  const templates = useLiveQuery(() => getKV<ChoreTemplate[]>('choreTemplates', []), [], [] as ChoreTemplate[])
   const [claim, setClaim] = useState<number | null>(null)
   const [reward, setReward] = useState({ title: '', cost: 50, scope: 'team' as 'team' | 'personal' })
   const [adj, setAdj] = useState<{ memberId?: number; points: number; reason: string } | null>(null)
@@ -36,12 +42,43 @@ export default function Family() {
   const done = prog && prog.total >= prog.quest.target
 
   const isDone = (c: Chore) => c.repeat === 'none' ? !!c.doneDate : c.repeat === 'daily' ? c.doneDate === today : c.doneDate !== undefined && c.doneDate >= wk && c.repeat === 'weekly'
-  async function complete(c: Chore, by: number) {
-    await db.chores.update(c.id, { doneBy: by, doneDate: today })
+  // Only a parent on a full account can approve or change chores. If a family has no parent profile yet, anyone can.
+  const meM = members.find((m) => m.id === me)
+  const isParent = !members.some((m) => m.role === 'parent') || (meM?.role === 'parent' && family?.access !== 'limited')
+  const pending = chores.filter((c) => c.pendingBy && !isDone(c))
+  async function finish(c: Chore, by: number, day = today) {
+    await db.chores.update(c.id, { doneBy: by, doneDate: day, pendingBy: undefined, pendingTs: undefined })
     await award(by, Math.round(c.points * pointScale()), `Chore: ${c.title}`)
     toast({ title: `${mem(by)?.name} did "${c.title}"`, body: `+${c.points} for the team!` })
-    void celebrate(false); setClaim(null)
+    void celebrate(false)
   }
+  async function complete(c: Chore, by: number) {
+    setClaim(null)
+    if (prefs.requireApproval && !isParent) {
+      await db.chores.update(c.id, { pendingBy: by, pendingTs: Date.now() })
+      toast({ title: 'Sent to a parent', body: 'Points arrive when they give a thumbs-up.' })
+      return
+    }
+    await finish(c, by)
+  }
+  const approve = (c: Chore) => finish(c, c.pendingBy!, c.pendingTs ? ymd(new Date(c.pendingTs)) : today)
+  const notYet = (c: Chore) => db.chores.update(c.id, { pendingBy: undefined, pendingTs: undefined })
+  async function saveChore() {
+    if (!chore?.title?.trim()) return
+    const rec = { title: chore.title.trim(), points: Math.max(1, Number(chore.points) || 1), repeat: chore.repeat ?? 'daily', assigneeId: chore.assigneeId }
+    if (chore.id) await db.chores.update(chore.id, rec)
+    else await db.chores.add(rec as never)
+    if (saveTpl && !templates.some((t) => t.title.toLowerCase() === rec.title.toLowerCase() && t.points === rec.points)) {
+      await setKV('choreTemplates', [...templates, { id: Math.random().toString(36).slice(2, 9), title: rec.title, points: rec.points, repeat: rec.repeat }])
+    }
+    setChore(null); setSaveTpl(false)
+  }
+  const startFrom = (t: { title: string; points: number; repeat: Chore['repeat'] }) => setChore((c) => ({ ...c, title: t.title, points: t.points, repeat: t.repeat }))
+  // the friendly weekly challenge (children only; resets every Sunday)
+  const children = members.filter((m) => m.role === 'child')
+  const board = standings(ledger, children, wk, today)
+  const lastWeek = awards(standings(ledger, children, ymd(new Date(new Date(wk + 'T00:00:00').getTime() - 7 * 86400000)), ymd(new Date(new Date(wk + 'T00:00:00').getTime() - 86400000))))
+  const topEffort = Math.max(1, ...board.map((b) => b.effort))
   async function claimReward(id: number) {
     const r = rewards.find((x) => x.id === id)!
     if (r.scope === 'team') {
@@ -76,10 +113,57 @@ export default function Family() {
         )}
       </div>
 
+      {pending.length > 0 && (
+        <div className="card" style={{ borderColor: 'var(--amber)' }}>
+          <h3>⏳ {isParent ? 'Waiting for your thumbs-up' : 'Waiting for a parent'}</h3>
+          <div className="stack" style={{ marginTop: 10 }}>
+            {pending.map((c) => (
+              <div className="item" key={c.id}><Who m={mem(c.pendingBy)} size={32} />
+                <div className="grow"><div className="title">{mem(c.pendingBy)?.name}: {c.title}</div><div className="muted">+{c.points} points when approved</div></div>
+                {isParent ? <><button className="btn sm mint" onClick={() => approve(c)}><Check size={14} />Approve</button><button className="btn sm" onClick={() => notYet(c)}>Not yet</button></> : <span className="chip">Sent</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {prefs.board === 'friendly' && children.length > 0 && (
+        <div className="card">
+          <div className="row between"><h3>🏁 This week's friendly challenge</h3><span className="muted small">Fresh start every Sunday</span></div>
+          <div className="stack" style={{ marginTop: 10 }}>
+            {board.map((b, i) => {
+              const m = mem(b.id)
+              return (
+                <div className="item" key={b.id}>
+                  <span style={{ fontSize: 24, width: 30, textAlign: 'center' }}>{b.effort > 0 ? ['🥇', '🥈', '🥉'][i] ?? '⭐' : '🌱'}</span>
+                  <Who m={m} size={38} />
+                  <div className="grow">
+                    <div className="title">{m?.name}</div>
+                    <div className="meter" style={{ height: 8, margin: '4px 0' }}><i style={{ width: `${Math.round((b.effort / topEffort) * 100)}%` }} /></div>
+                    <div className="muted small">{b.points} pts • {b.days} active day{b.days === 1 ? '' : 's'}{b.streak >= 2 ? ` • 🔥 ${b.streak} in a row` : ''}{b.delta > 0 ? ` • ↑ ${b.delta} more than last week` : ''}</div>
+                  </div>
+                  <span className="chip good">{b.effort}</span>
+                </div>
+              )
+            })}
+            {board.every((b) => b.effort === 0) && <div className="muted">A fresh week! Finish a routine step or a chore to get on the board.</div>}
+          </div>
+          <div className="muted small" style={{ marginTop: 8 }}>Effort score = points (little ones get a boost) + 5 for every active day + streak bonus. Everyone who tries counts.</div>
+          {lastWeek.length > 0 && (
+            <>
+              <h3 style={{ marginTop: 14 }}>Last week's winners</h3>
+              <div className="row" style={{ marginTop: 8, gap: 8 }}>
+                {lastWeek.map((a) => <div className="badge-tile" key={a.key} style={{ minWidth: 130 }}><div style={{ fontSize: 28 }}>{a.icon}</div><b>{a.title}</b><div className="muted small">{a.ids.map((i) => mem(i)?.name).join(' & ')}</div><div className="muted small">{a.why}</div></div>)}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="grid g2" style={{ marginTop: 14 }}>
         <div className="card" style={{ marginTop: 0 }}>
           <h3>The team this week</h3>
-          <div className="muted small">Contributions, not rankings. Every person counts.</div>
+          <div className="muted small">{prefs.board === 'friendly' ? 'Everyone\'s contribution, in points.' : 'Contributions, not rankings. Every person counts.'}</div>
           <div className="stack" style={{ marginTop: 10 }}>
             {kids.map((m) => (
               <div className="item" key={m.id}><Who m={m} size={40} />
@@ -98,18 +182,19 @@ export default function Family() {
         </div>
 
         <div className="card" style={{ marginTop: 0 }}>
-          <div className="row between"><h3><Hand size={16} style={{ verticalAlign: -2 }} /> Shared chores</h3><button className="btn sm primary" onClick={() => setChore({ title: '', points: 10, repeat: 'daily' })}><Plus size={14} />Add</button></div>
+          <div className="row between"><h3><Hand size={16} style={{ verticalAlign: -2 }} /> Shared chores</h3><div className="row" style={{ gap: 6 }}>{isParent && <button className="btn sm" aria-label="Team settings" onClick={() => setSetup(true)}><Settings2 size={14} /></button>}{isParent && <button className="btn sm primary" onClick={() => { setSaveTpl(false); setChore({ title: '', points: 10, repeat: 'daily' }) }}><Plus size={14} />Add</button>}</div></div>
           <div className="stack" style={{ marginTop: 10 }}>
-            {chores.length === 0 && <Empty>Add chores. Leave them "up for grabs" so anyone can jump in.</Empty>}
+            {chores.length === 0 && <Empty>{isParent ? 'Add chores. Pick from ready-made ones or make your own.' : 'No chores yet. A parent can add some.'}</Empty>}
             {chores.map((c) => {
               const d = isDone(c)
+              const wait = !!c.pendingBy && !d
               return (
                 <div key={c.id} className={`item ${d ? 'done' : ''}`}>
-                  <div className="grow"><div className="title">{c.title}</div>
+                  <div className="grow" style={isParent ? { cursor: 'pointer' } : undefined} onClick={() => isParent && (setSaveTpl(false), setChore(c))}><div className="title">{c.title}</div>
                     <div className="muted">{c.assigneeId ? `For ${mem(c.assigneeId)?.name}` : 'Up for grabs'} • {c.repeat === 'none' ? 'once' : c.repeat}{d && c.doneBy ? ` • done by ${mem(c.doneBy)?.name}` : ''}</div></div>
                   <span className="chip good">+{c.points}</span>
-                  {d ? <span className="chip">✓</span> : c.assigneeId ? <button className="btn sm mint" onClick={() => complete(c, c.assigneeId!)}>Done</button> : <button className="btn sm mint" onClick={() => setClaim(c.id)}>I did it</button>}
-                  <button className="btn ghost sm" aria-label="Delete chore" onClick={() => db.chores.delete(c.id)}><Trash2 size={14} /></button>
+                  {d ? <span className="chip">✓</span> : wait ? <span className="chip">⏳ {mem(c.pendingBy)?.name}</span> : c.assigneeId ? <button className="btn sm mint" onClick={() => complete(c, c.assigneeId!)}>Done</button> : <button className="btn sm mint" onClick={() => setClaim(c.id)}>I did it</button>}
+                  {isParent && <button className="btn ghost sm" aria-label="Delete chore" onClick={() => confirm(`Delete "${c.title}"?`) && db.chores.delete(c.id)}><Trash2 size={14} /></button>}
                 </div>
               )
             })}
@@ -165,15 +250,49 @@ export default function Family() {
         </Modal>
       )}
       {chore && (
-        <Modal title="New shared chore" onClose={() => setChore(null)}>
+        <Modal title={chore.id ? 'Edit chore' : 'New shared chore'} onClose={() => setChore(null)}>
           <div className="stack">
-            <label className="f">Chore<input value={chore.title ?? ''} onChange={(e) => setChore({ ...chore, title: e.target.value })} autoFocus /></label>
+            {!chore.id && (
+              <>
+                <div className="muted">Start from a template, or type your own below.</div>
+                <div className="row" style={{ maxHeight: 150, overflow: 'auto', gap: 6 }}>
+                  {templates.map((t) => (
+                    <span key={t.id} className="tab" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <span onClick={() => startFrom(t)} style={{ cursor: 'pointer' }}>⭐ {t.title} · {t.points}</span>
+                      <X size={12} aria-label={`Remove template ${t.title}`} style={{ cursor: 'pointer' }} onClick={() => void setKV('choreTemplates', templates.filter((x) => x.id !== t.id))} />
+                    </span>
+                  ))}
+                  {CHORE_PRESETS.map((t) => <button key={t.title} className="tab" onClick={() => startFrom(t)}>{t.title} · {t.points}</button>)}
+                </div>
+              </>
+            )}
+            <label className="f">Chore<input value={chore.title ?? ''} onChange={(e) => setChore({ ...chore, title: e.target.value })} autoFocus={!!chore.id} /></label>
             <div className="row">
               <label className="f">Points<input type="number" min={1} value={chore.points} onChange={(e) => setChore({ ...chore, points: Number(e.target.value) })} /></label>
               <label className="f">Repeats<select value={chore.repeat} onChange={(e) => setChore({ ...chore, repeat: e.target.value as Chore['repeat'] })}><option value="none">Once</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label>
               <label className="f">Who<MemberPick any anyLabel="Up for grabs" members={kids} value={chore.assigneeId} onChange={(v) => setChore({ ...chore, assigneeId: v })} /></label>
             </div>
-            <button className="btn primary" onClick={async () => { if (!chore.title?.trim()) return; await db.chores.add({ ...chore, title: chore.title.trim() } as never); setChore(null) }}>Add chore</button>
+            <label className="row" style={{ gap: 8 }}><input type="checkbox" checked={saveTpl} onChange={(e) => setSaveTpl(e.target.checked)} /> Save as a template to reuse</label>
+            <div className="row between">
+              {chore.id ? <button className="btn ghost" onClick={async () => { if (confirm(`Delete "${chore.title}"?`)) { await db.chores.delete(chore.id!); setChore(null) } }}><Trash2 size={14} /> Delete</button> : <span />}
+              <button className="btn primary" disabled={!chore.title?.trim()} onClick={saveChore}>{chore.id ? 'Save changes' : 'Add chore'}</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {setup && (
+        <Modal title="Team settings" onClose={() => setSetup(false)}>
+          <div className="stack">
+            <label className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+              <input type="checkbox" checked={prefs.requireApproval} onChange={(e) => void setKV('prefs', { ...prefs, requireApproval: e.target.checked })} />
+              <span><b>Parents approve chores</b><br /><span className="muted">A child taps "I did it", a parent gives a thumbs-up, then the points count.</span></span>
+            </label>
+            <div><b>Leaderboard</b></div>
+            <div className="seg">
+              <button type="button" className={prefs.board === 'team' ? 'on' : ''} onClick={() => void setKV('prefs', { ...prefs, board: 'team' })}>Team only</button>
+              <button type="button" className={prefs.board === 'friendly' ? 'on' : ''} onClick={() => void setKV('prefs', { ...prefs, board: 'friendly' })}>Friendly challenge</button>
+            </div>
+            <div className="muted small">{prefs.board === 'friendly' ? 'A weekly board that ranks effort (active days, streaks, points with a boost for little ones). It resets every Sunday and gives out awards like Most Improved.' : 'Only the shared team bar. No rankings.'}</div>
           </div>
         </Modal>
       )}

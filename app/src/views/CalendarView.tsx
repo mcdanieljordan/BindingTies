@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarPlus, ChevronLeft, ChevronRight, Plus, Trash2, Wand2 } from 'lucide-react'
+import { CalendarPlus, ChevronLeft, Copy, ChevronRight, Plus, Trash2, Wand2 } from 'lucide-react'
 import * as chrono from 'chrono-node'
 import { db, type EventItem, type Repeat } from '../db'
 import ImportCalendar from '../components/ImportCalendar'
@@ -18,6 +18,7 @@ export default function CalendarView() {
   const [edit, setEdit] = useState<Partial<EventItem> | null>(null)
   const [nl, setNl] = useState('')
   const [imp, setImp] = useState(false)
+  const [copying, setCopying] = useState(false)
   const app = useApp()
   const mem = (id?: number) => members.find((m) => m.id === id)
 
@@ -50,11 +51,17 @@ export default function CalendarView() {
     setNl('')
   }
 
+  /** Opens a new event pre-filled from an existing one, so only the date (or whatever differs) needs changing. */
+  function copyEvent(e: EventItem) {
+    const c: Partial<EventItem> = { ...e }
+    delete c.id; delete c.feed
+    setCopying(true); setEdit(c)
+  }
   async function save() {
     if (!edit?.title?.trim()) return
     const rec = { ...edit, title: edit.title.trim(), start: edit.start || undefined, end: edit.end || undefined } as EventItem
     if (rec.id) await db.events.put(rec); else await db.events.add(rec as never)
-    setSel(rec.date); setEdit(null)
+    setSel(rec.date); setEdit(null); setCopying(false)
   }
 
   const dayEvents = eventsOn(events, sel)
@@ -105,6 +112,7 @@ export default function CalendarView() {
                   <div className="muted">{e.start ? `${fmtTime(e.start)}${e.end ? ' – ' + fmtTime(e.end) : ''}` : 'All day'}{e.repeat !== 'none' ? ` • repeats ${e.repeat}` : ''}{e.remindMin ? ` • remind ${e.remindMin}m before` : ''}</div>
                   <div className="row" style={{ marginTop: 4 }}>{e.memberIds.map((i) => <MemberChip key={i} m={mem(i)} />)}{e.driverId && <span className="chip">Driver: {mem(e.driverId)?.name}</span>}</div>
                 </div>
+                <button className="btn ghost sm" aria-label={`Copy ${e.title}`} onClick={() => copyEvent(e)}><Copy size={16} /></button>
                 <button className="btn ghost sm" aria-label="Delete event" onClick={() => confirm(`Delete "${e.title}"?`) && db.events.delete(e.id)}><Trash2 size={16} /></button>
               </div>
             ))}
@@ -114,7 +122,7 @@ export default function CalendarView() {
 
       {imp && <ImportCalendar onClose={() => setImp(false)} onDone={(d) => { if (d) { setSel(d); const x = new Date(d + 'T00:00:00'); setCursor(new Date(x.getFullYear(), x.getMonth(), 1)) } }} />}
       {edit && (
-        <Modal title={edit.id ? 'Edit event' : 'New event'} onClose={() => setEdit(null)}>
+        <Modal title={edit.id ? 'Edit event' : copying ? 'Copy of event: pick the new date' : 'New event'} onClose={() => { setEdit(null); setCopying(false) }}>
           <div className="stack">
             <label className="f">Title<input value={edit.title ?? ''} onChange={(e) => setEdit({ ...edit, title: e.target.value })} autoFocus /></label>
             <div className="row">
@@ -135,7 +143,7 @@ export default function CalendarView() {
               <label className="f">Remind me<select value={edit.remindMin} onChange={(e) => setEdit({ ...edit, remindMin: Number(e.target.value) })}><option value={0}>No reminder</option><option value={5}>5 min before</option><option value={15}>15 min before</option><option value={30}>30 min before</option><option value={60}>1 hour before</option><option value={120}>2 hours before</option></select></label>
             </div>
             <label className="f">Notes<textarea rows={2} value={edit.notes ?? ''} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></label>
-            <div className="row between"><span className="muted small">Reminders fire while BindingTies is open. See Settings for notifications.</span><button className="btn primary" onClick={save}>Save</button></div>
+            <div className="row between"><span className="row" style={{ gap: 8 }}>{edit.id && <button className="btn" onClick={() => copyEvent(edit as EventItem)}><Copy size={14} /> Make a copy</button>}<span className="muted small">Reminders fire while BindingTies is open. See Settings for notifications.</span></span><button className="btn primary" onClick={save}>Save</button></div>
           </div>
         </Modal>
       )}

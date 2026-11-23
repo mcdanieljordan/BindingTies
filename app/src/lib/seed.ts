@@ -46,3 +46,29 @@ export async function seedSample() {
     { title: 'Water the plants', points: 8, repeat: 'weekly' },
   ] as never[])
 }
+
+/** Ready-made chores a parent can start from. Points are a suggestion. */
+export const CHORE_PRESETS: { title: string; points: number; repeat: 'none' | 'daily' | 'weekly'; ages: string }[] = [
+  { title: 'Make your bed', points: 5, repeat: 'daily', ages: '4+' },
+  { title: 'Feed the pet', points: 5, repeat: 'daily', ages: '5+' },
+  { title: 'Set the table', points: 5, repeat: 'daily', ages: '4+' },
+  { title: 'Clear the table', points: 5, repeat: 'daily', ages: '4+' },
+  { title: 'Put toys away', points: 5, repeat: 'daily', ages: '3+' },
+  { title: 'Pack school bag', points: 5, repeat: 'daily', ages: '5+' },
+  { title: 'Read for 20 minutes', points: 10, repeat: 'daily', ages: '5+' },
+  { title: 'Homework finished', points: 10, repeat: 'daily', ages: '6+' },
+  { title: 'Load the dishwasher', points: 10, repeat: 'daily', ages: '7+' },
+  { title: 'Unload the dishwasher', points: 10, repeat: 'daily', ages: '6+' },
+  { title: 'Tidy your room', points: 10, repeat: 'weekly', ages: '5+' },
+  { title: 'Put away laundry', points: 10, repeat: 'weekly', ages: '6+' },
+  { title: 'Fold laundry', points: 15, repeat: 'weekly', ages: '8+' },
+  { title: 'Water the plants', points: 5, repeat: 'weekly', ages: '4+' },
+  { title: 'Take out the trash', points: 10, repeat: 'weekly', ages: '7+' },
+  { title: 'Wipe the counters', points: 5, repeat: 'daily', ages: '6+' },
+  { title: 'Sweep the floor', points: 10, repeat: 'weekly', ages: '7+' },
+  { title: 'Vacuum a room', points: 15, repeat: 'weekly', ages: '8+' },
+  { title: 'Help with groceries', points: 10, repeat: 'weekly', ages: '5+' },
+  { title: 'Clean the bathroom sink', points: 10, repeat: 'weekly', ages: '9+' },
+  { title: 'Walk the dog', points: 10, repeat: 'daily', ages: '9+' },
+  { title: 'Yard or garden help', points: 15, repeat: 'weekly', ages: '8+' },
+]

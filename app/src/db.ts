@@ -74,7 +74,13 @@ export interface Chore {
   doneDate?: string
   repeat: Repeat
   lastDone?: string
+  /** a child says they did it; a parent must approve before points count */
+  pendingBy?: number
+  pendingTs?: number
 }
+export interface ChoreTemplate { id: string; title: string; points: number; repeat: Repeat }
+export interface Prefs { requireApproval: boolean; board: 'team' | 'friendly' }
+export const DEFAULT_PREFS: Prefs = { requireApproval: true, board: 'friendly' }
 export interface Med {
   id: number
   name: string
@@ -199,7 +205,7 @@ db.version(1).stores({
 /* Random ids that stay unique across devices (fits safely in a JS number). */
 export const newId = () => Math.floor(Math.random() * 2 ** 48) + 1
 export const SYNCED = ['members', 'events', 'routines', 'runs', 'ledger', 'rewards', 'chores', 'meds', 'doses', 'timers', 'alarms', 'lists', 'listItems', 'vault', 'goals', 'photos'] as const
-export const SYNCED_KV = ['quest', 'feeds']
+export const SYNCED_KV = ['quest', 'feeds', 'prefs', 'choreTemplates']
 
 const isRemote = () => !!(Dexie.currentTransaction as unknown as { remote?: boolean } | null)?.remote
 const queue = (tbl: string, rid: unknown) => {
