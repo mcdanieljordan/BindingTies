@@ -75,7 +75,7 @@ export default function Vault() {
         <div className="grid g2">
           <div className="card" style={{ marginTop: 0 }}>
             <div className="row"><Who m={stu} size={42} /><h2>{stu.name}'s profile</h2></div>
-            <div className="muted small" style={{ margin: '6px 0' }}>What should any helper know? Diagnoses, strengths, triggers, what works, communication style, supports at school. Stays on this device.</div>
+            <div className="muted small" style={{ margin: '6px 0' }}>What should any helper know? Diagnoses, strengths, triggers, what works, communication style, supports at school. Saved in your family's private cloud space.</div>
             <textarea rows={7} defaultValue={stu.profile ?? ''} key={stu.id} placeholder="Example: Loves dinosaurs. Needs a visual schedule and a 2-minute warning before transitions. Reading is a strength; handwriting is hard…" onBlur={(e) => db.members.update(stu.id, { profile: e.target.value })} aria-label="Profile notes" />
             <div className="row between" style={{ marginTop: 14 }}><h3><Target size={16} style={{ verticalAlign: -2 }} /> Goals</h3><button className="btn sm" onClick={async () => { const t = prompt('New goal (e.g. "Read 20 minutes a night")'); if (t?.trim()) await db.goals.add({ memberId: stu.id, text: t.trim(), area: 'School', status: 'active', created: todayStr() } as never) }}><Plus size={14} />Goal</button></div>
             <div className="stack" style={{ marginTop: 8 }}>

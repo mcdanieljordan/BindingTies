@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Bell, Download, Moon, Plus, Send, Sun, Trash2, Upload } from 'lucide-react'
 import { db, type Member } from '../db'
-import { PageHead, MemberChip } from '../components/ui'
+import { PageHead } from '../components/ui'
 import { useApp } from '../ctx'
 import { isNative } from '../lib/native'
 import { useMembers } from '../lib/useData'
@@ -81,7 +81,7 @@ export default function SettingsView() {
           </div>
           <div className="card" style={{ background: 'var(--panel2)', boxShadow: 'none' }}>
             <b>Honest note on reminders</b>
-            <div className="muted small" style={{ marginTop: 4 }}>Without family sync, reminders fire only while BindingTies is open. With sync and push turned on, a server sends them even when the app is closed, but phones can still delay or drop web push (Do Not Disturb, battery saver, iOS limits). For critical medicine, keep a phone alarm as backup.</div>
+            <div className="muted small" style={{ marginTop: 4 }}>Without family sync, reminders fire only while BindingTies is open. With sync and push turned on, a server sends them even when the app is closed, but phones can still delay notifications (Do Not Disturb, battery saver). For critical medicine, keep a phone alarm as backup.</div>
           </div>
         </div>
 
@@ -89,9 +89,9 @@ export default function SettingsView() {
           <h3>Family</h3>
           <div className="stack" style={{ marginTop: 10 }}>
             {members.map((m) => (
-              <div className="item" key={m.id}>
+              <div className="item wrap" key={m.id}>
                 <Avatar icon={m.icon} color={m.color} />
-                <input value={m.name} style={{ flex: 1 }} onChange={(e) => edit(m, { name: e.target.value })} aria-label="Name" />
+                <input className="name" value={m.name} onChange={(e) => edit(m, { name: e.target.value })} aria-label="Name" />
                 <select value={m.role} onChange={(e) => edit(m, { role: e.target.value as Member['role'] })}><option value="parent">Parent</option><option value="child">Child</option><option value="caregiver">Caregiver</option></select>
                 <input type="number" min={1} max={19} style={{ width: 62 }} placeholder="Age" value={m.age ?? ''} onChange={(e) => edit(m, { age: e.target.value ? Number(e.target.value) : undefined })} aria-label="Age" />
                 <input type="color" value={m.color} onChange={(e) => edit(m, { color: e.target.value })} aria-label="Color" />
@@ -100,7 +100,6 @@ export default function SettingsView() {
               </div>
             ))}
             <div className="row"><input placeholder="Add person" value={nm} onChange={(e) => setNm(e.target.value)} style={{ flex: 1 }} /><button className="btn" onClick={async () => { if (!nm.trim()) return; const i = members.length; await db.members.add({ name: nm.trim(), role: 'child', color: COLORS[i % 8], icon: AVATARS[i % AVATARS.length] } as never); setNm('') }}><Plus size={14} />Add</button></div>
-            <div className="row">{members.map((m) => <MemberChip key={m.id} m={m} />)}</div>
           </div>
           <h3 style={{ marginTop: 18 }}>Your data</h3>
           <p className="muted">Your family's information is saved on this device and, when you are signed in, safely in your family's private cloud space. No ads or trackers. Make a backup now and then.</p>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Home, CalendarDays, ListChecks, Trophy, HeartPulse, ShoppingBasket, FolderHeart, Settings as Cog, MonitorPlay, Users } from 'lucide-react'
+import { Home, CalendarDays, ListChecks, Trophy, HeartPulse, ShoppingBasket, FolderHeart, Settings as Cog, MonitorPlay, Users, Menu } from 'lucide-react'
 import { AppCtx } from './ctx'
 import { DEFAULT_SETTINGS, loadSettings, startScheduler, type Settings, type Toast } from './lib/engine'
 import { db, getKV, setKV, wipeLocal } from './db'
@@ -39,6 +39,9 @@ const NAV = [
   { id: 'settings', label: 'Settings', I: Cog },
 ] as const
 
+// the phone's bottom bar shows these; everything else lives under "More"
+const MAIN: string[] = ['today', 'calendar', 'routines', 'family']
+const MORE_HINT: Record<string, string> = { care: 'Medicine, timers and alarms', lists: 'Groceries and shared lists', vault: 'School files, grades and goals', settings: 'People, look and feel, alerts, backup' }
 captureInvite()
 listenForAuthLink(finishNativeAuth)
 
@@ -180,12 +183,24 @@ export default function App() {
           {view === 'lists' && <Lists />}
           {view === 'vault' && !limited && <Vault />}
           {view === 'settings' && <SettingsView />}
+          {view === 'more' && (
+            <>
+              <h1 style={{ marginBottom: 14 }}>More</h1>
+              <div className="moremenu">
+                {nav.filter((n) => !MAIN.includes(n.id)).map(({ id, label, I }) => (
+                  <button key={id} onClick={() => setView(id)}><I size={24} /><span>{label}<small>{MORE_HINT[id]}</small></span></button>
+                ))}
+                <button onClick={() => setWall(true)}><MonitorPlay size={24} /><span>Wall display<small>Full-screen schedule for a tablet or TV</small></span></button>
+                <button onClick={() => setPickWho(true)}><Users size={24} /><span>I am {meMember.name}. Switch<small>Change who is using this device</small></span></button>
+              </div>
+            </>
+          )}
         </main>
         <nav className="bottom-nav no-print" aria-label="Main">
-          {nav.filter((n) => n.id !== 'settings').map(({ id, label, I }) => (
-            <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><I size={21} />{label.split(' ')[0]}</button>
+          {nav.filter((n) => MAIN.includes(n.id)).map(({ id, label, I }) => (
+            <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><I size={22} />{label.split(' ')[0]}</button>
           ))}
-          <button className={view === 'settings' ? 'active' : ''} onClick={() => setView('settings')}><Cog size={21} />More</button>
+          <button className={!MAIN.includes(view) ? 'active' : ''} onClick={() => setView('more')}><Menu size={22} />More</button>
         </nav>
       </div>
       <div className="toasts no-print" aria-live="polite">

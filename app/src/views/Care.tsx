@@ -93,7 +93,7 @@ function Meds() {
           </div>
           <div className="row">
             <label className="f">Notes<input value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} placeholder="with food" /></label>
-            <label className="f">Refill by<input type="date" value={f.refillDate} onChange={(e) => setF({ ...f, refillDate: e.target.value })} /></label>
+            <label className="f">Refill by (optional)<input type="date" value={f.refillDate} onChange={(e) => setF({ ...f, refillDate: e.target.value })} /></label>
           </div>
           <button className="btn primary" onClick={add}><Plus size={16} />Add</button>
         </div>
@@ -126,10 +126,10 @@ function Timers() {
         <div className="row" style={{ margin: '10px 0' }}>
           {[['Teeth', 2], ['Shoes on', 5], ['Tidy up', 10], ['Reading', 20], ['Screen time', 30]].map(([l, m]) => <button key={l} className="btn sm" onClick={() => start(String(l), Number(m))}>{l} • {m}m</button>)}
         </div>
-        <div className="row">
+        <div className="row" style={{ alignItems: 'flex-end' }}>
           <label className="f">Label<input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Leave for the bus" /></label>
           <label className="f" style={{ flex: '0 0 100px' }}>Minutes<input type="number" min={1} max={240} value={mins} onChange={(e) => setMins(Number(e.target.value))} /></label>
-          <button className="btn primary" onClick={() => { void start(label, mins); setLabel('') }}>Start</button>
+          <button className="btn primary wide-sm" onClick={() => { void start(label, mins); setLabel('') }}>Start</button>
         </div>
       </div>
       <div className="card" style={{ marginTop: 0 }}>
@@ -170,7 +170,7 @@ function Alarms() {
           </div>
           <div className="row">{DOW.map((d, i) => <button key={d} className={`tab ${a.days.includes(i) ? 'on' : ''}`} onClick={() => setA({ ...a, days: a.days.includes(i) ? a.days.filter((x) => x !== i) : [...a.days, i] })}>{d}</button>)}</div>
           <button className="btn primary" onClick={async () => { await db.alarms.add({ label: a.label || 'Alarm', time: a.time, days: a.days, enabled: true } as never); setA({ ...a, label: '' }) }}><Plus size={16} />Add alarm</button>
-          <div className="muted small"><BellRing size={12} style={{ verticalAlign: -1 }} /> Alarms ring while BindingTies is open on a device. For wake-up alarms you can't miss, keep a phone alarm as backup until the native app arrives.</div>
+          <div className="muted small"><BellRing size={12} style={{ verticalAlign: -1 }} /> Alarms ring while BindingTies is open, and send an alert to every device with alerts turned on, even when the app is closed. For wake-up alarms you can't miss, keep a phone alarm as backup.</div>
         </div>
       </div>
       <div className="card" style={{ marginTop: 0 }}>

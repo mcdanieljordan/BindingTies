@@ -26,9 +26,9 @@ export default function Lists() {
         <div className="card">
           <div className="row">
             <input style={{ flex: 1 }} value={text} placeholder="Add item…" onChange={(e) => setText(e.target.value)} onKeyDown={async (e) => { if (e.key === 'Enter' && text.trim()) { await db.listItems.add({ listId: l.id, text: text.trim(), done: false, category: cat } as never); setText('') } }} aria-label="Add item" />
-            <select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Category">{CATS.map((c) => <option key={c}>{c}</option>)}</select>
             <button className="btn primary" onClick={async () => { if (!text.trim()) return; await db.listItems.add({ listId: l.id, text: text.trim(), done: false, category: cat } as never); setText('') }}>Add</button>
           </div>
+          <div className="row" style={{ marginTop: 8, gap: 6 }} role="group" aria-label="Category">{CATS.map((c) => <button key={c} type="button" className={`tab ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>{c}</button>)}</div>
           <div className="stack" style={{ marginTop: 14 }}>
             {mine.length === 0 && <Empty>Nothing here yet.</Empty>}
             {groups.map((g) => (
