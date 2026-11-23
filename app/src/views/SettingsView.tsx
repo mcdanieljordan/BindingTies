@@ -3,6 +3,7 @@ import { Bell, Download, Moon, Plus, Send, Sun, Trash2, Upload } from 'lucide-re
 import { db, type Member } from '../db'
 import { PageHead, MemberChip } from '../components/ui'
 import { useApp } from '../ctx'
+import { isNative } from '../lib/native'
 import { useMembers } from '../lib/useData'
 import { beep, notifySupported } from '../lib/engine'
 import { AVATARS, Avatar } from '../lib/icons'
@@ -71,8 +72,10 @@ export default function SettingsView() {
             </div>
             <label className="row"><input type="checkbox" checked={settings.sound} onChange={(e) => setSettings({ sound: e.target.checked })} />Play a sound with reminders <button className="btn sm" onClick={() => beep()}>Test</button></label>
           </div>
+          {!isNative && <>
           <h3 style={{ marginTop: 18 }}><Bell size={16} style={{ verticalAlign: -2 }} /> Notifications</h3>
           <p className="muted">Status: <b>{perm}</b>. {perm === 'granted' ? '' : <button className="btn sm primary" onClick={enableNotifs} disabled={perm === 'unsupported'}>Turn on</button>}</p>
+          </>}
           <div className="card" style={{ background: 'var(--panel2)', boxShadow: 'none' }}>
             <SyncPanel />
           </div>
