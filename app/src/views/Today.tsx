@@ -8,6 +8,7 @@ import { eventsOn, fmtTime, fmtDate, greeting, todayStr } from '../lib/dates'
 import { questProgress } from '../lib/engine'
 import { Ico } from '../lib/icons'
 import JoinRequests from '../sync/JoinRequests'
+import InstallHint from '../components/InstallHint'
 
 export default function Today() {
   const { go, family } = useApp()
@@ -35,6 +36,7 @@ export default function Today() {
     <>
       <PageHead title={`${greeting()}!`} sub={fmtDate(today, { weekday: 'long', month: 'long', day: 'numeric' })} />
       <JoinRequests />
+      <InstallHint />
       <div className="card" onClick={() => go('family')} style={{ cursor: 'pointer' }}>
         <div className="row between"><h3><Trophy size={16} style={{ verticalAlign: -2 }} /> Family Quest: {q?.quest.title}</h3><span className="chip good">{q?.total ?? 0} / {q?.quest.target} team points</span></div>
         <div className="meter" style={{ margin: '10px 0 6px' }}><i style={{ width: `${q?.pct ?? 0}%` }} /></div>
